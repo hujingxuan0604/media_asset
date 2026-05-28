@@ -1,0 +1,24 @@
+name: media_asset
+description: A configurable Flutter image and video asset library with grid, preview, drag-drop, and shortcuts.
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cross_file: ^0.3.5+2
+  desktop_drop: ^0.7.0
+  fvp: ^0.35.2
+  video_player: ^2.10.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
