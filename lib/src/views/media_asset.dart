@@ -84,7 +84,6 @@ class MediaAssetLibrary extends StatefulWidget {
 class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
   late final MediaAssetSelectionController _selectionController;
   final Map<String, int> _duplicateHighlightTokens = {};
-  String? _activeAssetId;
 
   @override
   void initState() {
@@ -322,15 +321,12 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
         return MediaAssetGrid(
           assets: orderedAssets,
           selectedAssetIds: _selectionController.selectedAssetIds,
-          activeAssetId: _activeAssetId,
           duplicateHighlightTokens: _duplicateHighlightTokens,
           config: config,
           tileBuilder: widget.tileBuilder,
           menuBuilder: widget.menuBuilder,
           dragFeedbackBuilder: widget.dragFeedbackBuilder,
-          onTapAsset: (asset) {
-            setState(() => _activeAssetId = asset.id);
-          },
+          onTapAsset: (_) {},
           onPreviewAsset: (asset) {
             controller.handleAction(MediaAssetAction.preview, asset);
             _showPreview(context, asset, config, orderedAssets);

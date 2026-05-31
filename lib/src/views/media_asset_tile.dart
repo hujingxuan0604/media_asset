@@ -25,14 +25,12 @@ typedef MediaAssetMenuBuilder =
     );
 
 class MediaAssetTileState {
-  final bool isSelected;
   final bool isBatchSelected;
   final int duplicateHighlightToken;
   final double? tileExtent;
   final MediaAssetLibraryConfig config;
 
   const MediaAssetTileState({
-    required this.isSelected,
     required this.isBatchSelected,
     required this.config,
     this.duplicateHighlightToken = 0,
@@ -110,22 +108,19 @@ class _MediaAssetTileState extends State<MediaAssetTile>
   @override
   Widget build(BuildContext context) {
     final theme = MediaAssetTheme.of(context);
-    final highlight = widget.state.isSelected || widget.state.isBatchSelected;
     final canShowMenu = widget.state.config.interaction.enableContextMenu;
 
     return AnimatedBuilder(
       animation: _duplicateHighlightController,
       builder: (context, child) {
-        final baseBorderColor = highlight
-            ? theme.primary(context)
-            : theme.border(context);
+        final baseBorderColor = theme.border(context);
         final pulse = _duplicateHighlightPulse;
         final borderColor = Color.lerp(
           baseBorderColor,
           theme.primary(context),
           pulse,
         )!;
-        final borderWidth = (highlight ? 1.4 : 1.0) + pulse * 2.2;
+        final borderWidth = 1.0 + pulse * 2.2;
         final layout = widget.state.config.layout;
 
         return SizedBox(
@@ -147,9 +142,7 @@ class _MediaAssetTileState extends State<MediaAssetTile>
                     duration: const Duration(milliseconds: 140),
                     padding: layout.tilePadding,
                     decoration: BoxDecoration(
-                      color: highlight
-                          ? theme.primary(context).withValues(alpha: 0.08)
-                          : theme.elevatedSurface(context),
+                      color: theme.elevatedSurface(context),
                       borderRadius: theme.borderRadius,
                       border: Border.all(
                         color: borderColor,

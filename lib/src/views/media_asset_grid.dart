@@ -14,7 +14,6 @@ typedef MediaAssetDragFeedbackBuilder =
 class MediaAssetGrid extends StatelessWidget {
   final List<MediaAsset> assets;
   final Set<String> selectedAssetIds;
-  final String? activeAssetId;
   final Map<String, int> duplicateHighlightTokens;
   final MediaAssetLibraryConfig config;
   final ValueChanged<MediaAsset> onTapAsset;
@@ -35,7 +34,6 @@ class MediaAssetGrid extends StatelessWidget {
     required this.onTapAsset,
     required this.onPreviewAsset,
     this.duplicateHighlightTokens = const {},
-    this.activeAssetId,
     this.onToggleSelection,
     this.onDeleteAsset,
     this.onRevealAssetInFolder,
@@ -92,7 +90,6 @@ class MediaAssetGrid extends StatelessWidget {
   ) {
     final interaction = config.interaction;
     final state = MediaAssetTileState(
-      isSelected: activeAssetId == asset.id,
       isBatchSelected: selectedAssetIds.contains(asset.id),
       duplicateHighlightToken: duplicateHighlightTokens[asset.id] ?? 0,
       tileExtent: tileExtent,
