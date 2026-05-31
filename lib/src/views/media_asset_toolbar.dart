@@ -13,7 +13,6 @@ class MediaAssetToolbar extends StatelessWidget {
   final VoidCallback? onAddPressed;
   final VoidCallback? onSelectAll;
   final VoidCallback? onClearSelection;
-  final VoidCallback? onCopySelectedPaths;
   final VoidCallback? onDeleteSelected;
 
   const MediaAssetToolbar({
@@ -26,7 +25,6 @@ class MediaAssetToolbar extends StatelessWidget {
     this.onAddPressed,
     this.onSelectAll,
     this.onClearSelection,
-    this.onCopySelectedPaths,
     this.onDeleteSelected,
   });
 
@@ -65,12 +63,6 @@ class MediaAssetToolbar extends StatelessWidget {
           ),
         ),
         if (selectedCount > 0) ...[
-          _ToolbarIconButton(
-            icon: Icons.content_copy_outlined,
-            tooltip: config.text.copySelectedPathsTooltip,
-            onTap: onCopySelectedPaths,
-          ),
-          const SizedBox(width: 8),
           _ToolbarIconButton(
             icon: Icons.delete_outline_rounded,
             tooltip: config.text.deleteSelectedTooltip,

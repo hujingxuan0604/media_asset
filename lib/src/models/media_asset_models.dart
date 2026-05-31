@@ -12,7 +12,7 @@ enum MediaAssetType {
   }
 }
 
-enum MediaAssetAction { preview, select, delete, revealInFolder, copyPath }
+enum MediaAssetAction { preview, select, delete, revealInFolder }
 
 enum RejectedMediaFileReason {
   unsupportedType,

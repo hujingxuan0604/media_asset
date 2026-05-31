@@ -46,7 +46,6 @@ class MediaAssetTile extends StatefulWidget {
   final VoidCallback? onToggleSelection;
   final VoidCallback? onDelete;
   final VoidCallback? onRevealInFolder;
-  final VoidCallback? onCopyPath;
   final MediaAssetMenuBuilder? menuBuilder;
 
   const MediaAssetTile({
@@ -58,7 +57,6 @@ class MediaAssetTile extends StatefulWidget {
     this.onToggleSelection,
     this.onDelete,
     this.onRevealInFolder,
-    this.onCopyPath,
     this.menuBuilder,
   });
 
@@ -266,7 +264,6 @@ class _MediaAssetTileState extends State<MediaAssetTile>
           canPreview: widget.onDoubleTap != null,
           canSelect: widget.onToggleSelection != null,
           canRevealInFolder: widget.onRevealInFolder != null,
-          canCopyPath: widget.onCopyPath != null,
           canDelete: widget.onDelete != null,
           onClose: () => navigator.pop(),
           onAction: (action) {
@@ -310,9 +307,6 @@ class _MediaAssetTileState extends State<MediaAssetTile>
         break;
       case MediaAssetAction.revealInFolder:
         widget.onRevealInFolder?.call();
-        break;
-      case MediaAssetAction.copyPath:
-        widget.onCopyPath?.call();
         break;
       case MediaAssetAction.delete:
         widget.onDelete?.call();

@@ -59,7 +59,6 @@ class MediaAssetInteractionConfig {
       MediaAssetAction.select,
       MediaAssetAction.delete,
       MediaAssetAction.revealInFolder,
-      MediaAssetAction.copyPath,
     },
   });
 
@@ -137,15 +136,11 @@ class MediaAssetTextConfig {
   final String selectActionLabel;
   final String cancelSelectActionLabel;
   final String revealInFolderActionLabel;
-  final String copyPathActionLabel;
   final String deleteActionLabel;
-  final String copySelectedPathsTooltip;
   final String deleteSelectedTooltip;
   final String selectAllTooltip;
   final String clearSelectionTooltip;
   final String deleteAssetTooltip;
-  final String copyPathSuccessMessage;
-  final String copySelectedPathsSuccessMessageTemplate;
   final String duplicateImportMessageTemplate;
   final String imageLoadFailureMessage;
   final String videoMissingMessage;
@@ -168,15 +163,11 @@ class MediaAssetTextConfig {
     this.selectActionLabel = '选择',
     this.cancelSelectActionLabel = '取消选择',
     this.revealInFolderActionLabel = '在文件夹中显示',
-    this.copyPathActionLabel = '复制路径',
     this.deleteActionLabel = '删除',
-    this.copySelectedPathsTooltip = '复制所选路径',
     this.deleteSelectedTooltip = '删除所选',
     this.selectAllTooltip = '全选',
     this.clearSelectionTooltip = '清空选择',
     this.deleteAssetTooltip = '删除素材',
-    this.copyPathSuccessMessage = '已复制文件路径',
-    this.copySelectedPathsSuccessMessageTemplate = '已复制 {count} 个文件路径',
     this.duplicateImportMessageTemplate =
         '导入 {imported} 个文件，重复 {duplicate} 个文件',
     this.imageLoadFailureMessage = '图片加载失败',
@@ -199,13 +190,6 @@ class MediaAssetTextConfig {
     return duplicateImportMessageTemplate
         .replaceAll('{imported}', importedCount.toString())
         .replaceAll('{duplicate}', duplicateCount.toString());
-  }
-
-  String copySelectedPathsSuccessMessage(int count) {
-    return copySelectedPathsSuccessMessageTemplate.replaceAll(
-      '{count}',
-      count.toString(),
-    );
   }
 }
 

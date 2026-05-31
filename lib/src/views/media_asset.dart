@@ -9,7 +9,6 @@ import '../controllers/media_asset_controller.dart';
 import '../controllers/media_asset_import_controller.dart';
 import '../controllers/media_asset_selection_controller.dart';
 import '../models/media_asset_models.dart';
-import '../services/clipboard_path_service.dart';
 import '../services/local_file_picker_service.dart';
 import '../services/local_file_reveal_service.dart';
 import '../theme/media_asset_theme.dart';
@@ -187,17 +186,6 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
                           )
                       ? null
                       : () => widget.onDeleteSelectedAssets!(selectedAssets),
-                  onCopySelectedPaths:
-                      selectedAssets.isEmpty ||
-                          !scopedConfig.interaction.isActionEnabled(
-                            MediaAssetAction.copyPath,
-                          )
-                      ? null
-                      : () => _copySelectedAssetPaths(
-                          context,
-                          controller,
-                          selectedAssets,
-                        ),
                 ),
                 const SizedBox(height: 12),
               ],
@@ -368,9 +356,6 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
                   );
                   widget.onRevealAssetInFolder!(asset);
                 },
-          onCopyAssetPath: (asset) {
-            _copyAssetPath(context, controller, asset);
-          },
         );
       },
     );
@@ -460,67 +445,6 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
       return;
     }
     await _handleDroppedFiles(context, config, controller, files);
-  }
-
-  void _copyAssetPath(
-    BuildContext context,
-    MediaAssetLibraryController controller,
-    MediaAsset asset,
-  ) {
-    controller.handleAction(MediaAssetAction.copyPath, asset);
-    _copyPathsToClipboard(
-      context,
-      [asset],
-      config: controller.config,
-      message: controller.config.text.copyPathSuccessMessage,
-    );
-  }
-
-  void _copySelectedAssetPaths(
-    BuildContext context,
-    MediaAssetLibraryController controller,
-    List<MediaAsset> assets,
-  ) {
-    if (assets.isEmpty) {
-      return;
-    }
-
-    for (final asset in assets) {
-      controller.handleAction(MediaAssetAction.copyPath, asset);
-    }
-    _copyPathsToClipboard(
-      context,
-      assets,
-      config: controller.config,
-      message: controller.config.text.copySelectedPathsSuccessMessage(
-        assets.length,
-      ),
-    );
-  }
-
-  void _copyPathsToClipboard(
-    BuildContext context,
-    List<MediaAsset> assets, {
-    required MediaAssetLibraryConfig config,
-    required String message,
-  }) {
-    unawaited(
-      const ClipboardPathService()
-          .copyPaths(assets.map((asset) => asset.filePath))
-          .catchError((Object error, StackTrace stackTrace) {
-            widget.onActionError?.call(
-              MediaAssetAction.copyPath,
-              assets,
-              error,
-              stackTrace,
-            );
-          }),
-    );
-    ScaffoldMessenger.maybeOf(context)
-      ?..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-      );
   }
 
   Future<void> _showPreview(

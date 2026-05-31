@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:media_asset/media_asset.dart';
 import 'package:media_asset/src/controllers/media_asset_controller.dart';
@@ -560,24 +559,6 @@ void main() {
   });
 
   testWidgets('shows default context menu without a builder', (tester) async {
-    String? copiedText;
-    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-      SystemChannels.platform,
-      (call) async {
-        if (call.method == 'Clipboard.setData') {
-          copiedText =
-              (call.arguments as Map<dynamic, dynamic>)['text'] as String?;
-        }
-        return null;
-      },
-    );
-    addTearDown(() {
-      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        SystemChannels.platform,
-        null,
-      );
-    });
-
     MediaAsset? revealedAsset;
     MediaAsset? deletedAsset;
     final actions = <MediaAssetAction>[];
@@ -622,25 +603,13 @@ void main() {
     expect(find.text('预览'), findsOneWidget);
     expect(find.text('选择'), findsOneWidget);
     expect(find.text('在文件夹中显示'), findsOneWidget);
-    expect(find.text('复制路径'), findsOneWidget);
     expect(find.text('删除'), findsOneWidget);
 
-    await tester.tap(find.text('复制路径'));
-    await tester.pumpAndSettle();
-
-    expect(copiedText, '/tmp/asset.png');
-    expect(actions, [MediaAssetAction.copyPath]);
-    expect(find.text('已复制文件路径'), findsOneWidget);
-
-    await tester.tapAt(
-      tester.getCenter(findAssetDrag('asset')),
-      buttons: kSecondaryMouseButton,
-    );
-    await tester.pumpAndSettle();
     await tester.tap(find.text('在文件夹中显示'));
     await tester.pumpAndSettle();
 
     expect(revealedAsset?.id, 'asset');
+    expect(actions, [MediaAssetAction.revealInFolder]);
 
     await tester.tapAt(
       tester.getCenter(findAssetDrag('asset')),
@@ -653,35 +622,14 @@ void main() {
     expect(deletedAsset?.id, 'asset');
   });
 
-  testWidgets('customizes default action labels and messages', (tester) async {
-    String? copiedText;
-    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-      SystemChannels.platform,
-      (call) async {
-        if (call.method == 'Clipboard.setData') {
-          copiedText =
-              (call.arguments as Map<dynamic, dynamic>)['text'] as String?;
-        }
-        return null;
-      },
-    );
-    addTearDown(() {
-      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        SystemChannels.platform,
-        null,
-      );
-    });
-
+  testWidgets('customizes default action labels', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: MediaAssetLibrary(
             config: const MediaAssetLibraryConfig(
               layout: MediaAssetLayoutConfig(showToolbar: false),
-              text: MediaAssetTextConfig(
-                copyPathActionLabel: '复制本地路径',
-                copyPathSuccessMessage: '路径已复制',
-              ),
+              text: MediaAssetTextConfig(revealInFolderActionLabel: '定位文件'),
             ),
             assets: [
               MediaAsset(
@@ -703,11 +651,8 @@ void main() {
       buttons: kSecondaryMouseButton,
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('复制本地路径'));
-    await tester.pumpAndSettle();
 
-    expect(copiedText, '/tmp/asset.png');
-    expect(find.text('路径已复制'), findsOneWidget);
+    expect(find.text('定位文件'), findsOneWidget);
   });
 
   testWidgets('hides disabled default actions', (tester) async {
@@ -747,126 +692,7 @@ void main() {
     expect(find.text('预览'), findsOneWidget);
     expect(find.text('选择'), findsNothing);
     expect(find.text('在文件夹中显示'), findsNothing);
-    expect(find.text('复制路径'), findsNothing);
     expect(find.text('删除'), findsNothing);
-  });
-
-  testWidgets('reports default copy action errors', (tester) async {
-    MediaAssetAction? errorAction;
-    List<MediaAsset>? errorAssets;
-
-    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-      SystemChannels.platform,
-      (call) async {
-        if (call.method == 'Clipboard.setData') {
-          throw PlatformException(code: 'copy_failed');
-        }
-        return null;
-      },
-    );
-    addTearDown(() {
-      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        SystemChannels.platform,
-        null,
-      );
-    });
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: MediaAssetLibrary(
-            config: const MediaAssetLibraryConfig(
-              layout: MediaAssetLayoutConfig(showToolbar: false),
-            ),
-            assets: [
-              MediaAsset(
-                id: 'asset',
-                name: 'asset.png',
-                filePath: '/tmp/asset.png',
-                type: MediaAssetType.image,
-                fileSize: 0,
-                createdAt: DateTime(2026, 1, 1),
-              ),
-            ],
-            onActionError: (action, assets, error, stackTrace) {
-              errorAction = action;
-              errorAssets = assets;
-            },
-          ),
-        ),
-      ),
-    );
-
-    await tester.tapAt(
-      tester.getCenter(findAssetDrag('asset')),
-      buttons: kSecondaryMouseButton,
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('复制路径'));
-    await tester.pumpAndSettle();
-
-    expect(errorAction, MediaAssetAction.copyPath);
-    expect(errorAssets?.single.id, 'asset');
-  });
-
-  testWidgets('copies selected asset paths from toolbar', (tester) async {
-    String? copiedText;
-    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-      SystemChannels.platform,
-      (call) async {
-        if (call.method == 'Clipboard.setData') {
-          copiedText =
-              (call.arguments as Map<dynamic, dynamic>)['text'] as String?;
-        }
-        return null;
-      },
-    );
-    addTearDown(() {
-      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        SystemChannels.platform,
-        null,
-      );
-    });
-
-    final actions = <String>[];
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: MediaAssetLibrary(
-            selectedAssetIds: const {'a', 'b'},
-            assets: [
-              MediaAsset(
-                id: 'a',
-                name: 'a.png',
-                filePath: '/tmp/a.png',
-                type: MediaAssetType.image,
-                fileSize: 0,
-                createdAt: DateTime(2026, 1, 1),
-              ),
-              MediaAsset(
-                id: 'b',
-                name: 'b.png',
-                filePath: '/tmp/b.png',
-                type: MediaAssetType.image,
-                fileSize: 0,
-                createdAt: DateTime(2026, 1, 2),
-              ),
-            ],
-            onAssetAction: (action, asset) {
-              actions.add('${action.name}:${asset.id}');
-            },
-          ),
-        ),
-      ),
-    );
-
-    await tester.tap(find.byIcon(Icons.content_copy_outlined));
-    await tester.pumpAndSettle();
-
-    expect(copiedText, '/tmp/b.png\n/tmp/a.png');
-    expect(actions, ['copyPath:b', 'copyPath:a']);
-    expect(find.text('已复制 2 个文件路径'), findsOneWidget);
   });
 
   testWidgets('hides context menu when disabled', (tester) async {
@@ -902,7 +728,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('预览'), findsNothing);
-    expect(find.text('复制路径'), findsNothing);
+    expect(find.text('在文件夹中显示'), findsNothing);
   });
 
   testWidgets('shows custom context menu from builder and wires actions', (

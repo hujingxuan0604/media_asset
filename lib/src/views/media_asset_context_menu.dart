@@ -9,7 +9,6 @@ class MediaAssetMenuController {
   final bool canPreview;
   final bool canSelect;
   final bool canRevealInFolder;
-  final bool canCopyPath;
   final bool canDelete;
   final VoidCallback _onClose;
   final ValueChanged<MediaAssetAction> _onAction;
@@ -19,7 +18,6 @@ class MediaAssetMenuController {
     required this.canPreview,
     required this.canSelect,
     required this.canRevealInFolder,
-    required this.canCopyPath,
     required this.canDelete,
     required VoidCallback onClose,
     required ValueChanged<MediaAssetAction> onAction,
@@ -46,12 +44,6 @@ class MediaAssetMenuController {
     }
   }
 
-  void copyPath() {
-    if (canCopyPath) {
-      _onAction(MediaAssetAction.copyPath);
-    }
-  }
-
   void delete() {
     if (canDelete) {
       _onAction(MediaAssetAction.delete);
@@ -68,9 +60,6 @@ class MediaAssetMenuController {
         break;
       case MediaAssetAction.revealInFolder:
         revealInFolder();
-        break;
-      case MediaAssetAction.copyPath:
-        copyPath();
         break;
       case MediaAssetAction.delete:
         delete();
@@ -129,12 +118,6 @@ class DefaultMediaAssetContextMenu extends StatelessWidget {
                   icon: Icons.folder_open_outlined,
                   label: config.text.revealInFolderActionLabel,
                   onTap: controller.revealInFolder,
-                ),
-              if (controller.canCopyPath)
-                _DefaultMenuItem(
-                  icon: Icons.content_copy_outlined,
-                  label: config.text.copyPathActionLabel,
-                  onTap: controller.copyPath,
                 ),
               if (controller.canDelete) ...[
                 const SizedBox(height: 5),

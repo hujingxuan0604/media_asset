@@ -13,8 +13,8 @@ It provides:
 - image preview with zoom and navigation shortcuts
 - video preview with playback, seek controls, and navigation shortcuts
 - callback-based import, delete, reveal-in-folder, and selection integration
-- default desktop context menu with preview, selection, reveal-in-folder, copy
-  path, and delete actions
+- default desktop context menu with preview, selection, reveal-in-folder, and
+  delete actions
 
 ## Usage
 
@@ -129,5 +129,5 @@ The example demonstrates:
 - dragging imported assets into another module panel
 - converting file paths to `MediaAsset`
 - default and custom context menus
-- selection, batch delete, single delete, reveal-in-folder, and copy-path actions
+- selection, batch delete, single delete, and reveal-in-folder actions
 - previewing local images and videos

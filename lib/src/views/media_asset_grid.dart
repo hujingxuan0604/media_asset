@@ -21,7 +21,6 @@ class MediaAssetGrid extends StatelessWidget {
   final ValueChanged<MediaAsset>? onToggleSelection;
   final ValueChanged<MediaAsset>? onDeleteAsset;
   final ValueChanged<MediaAsset>? onRevealAssetInFolder;
-  final ValueChanged<MediaAsset>? onCopyAssetPath;
   final MediaAssetTileBuilder? tileBuilder;
   final MediaAssetMenuBuilder? menuBuilder;
   final MediaAssetDragFeedbackBuilder? dragFeedbackBuilder;
@@ -37,7 +36,6 @@ class MediaAssetGrid extends StatelessWidget {
     this.onToggleSelection,
     this.onDeleteAsset,
     this.onRevealAssetInFolder,
-    this.onCopyAssetPath,
     this.tileBuilder,
     this.menuBuilder,
     this.dragFeedbackBuilder,
@@ -120,11 +118,6 @@ class MediaAssetGrid extends StatelessWidget {
                   !interaction.isActionEnabled(MediaAssetAction.revealInFolder)
               ? null
               : () => onRevealAssetInFolder!(asset),
-          onCopyPath:
-              onCopyAssetPath == null ||
-                  !interaction.isActionEnabled(MediaAssetAction.copyPath)
-              ? null
-              : () => onCopyAssetPath!(asset),
           menuBuilder: menuBuilder,
         );
 
