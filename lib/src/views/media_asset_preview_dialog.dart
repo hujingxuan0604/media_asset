@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -30,8 +32,12 @@ class _MediaAssetPreviewDialogState extends State<MediaAssetPreviewDialog> {
   late final MediaAssetPreviewController _controller;
   late final TransformationController _transformationController;
   late final FocusNode _focusNode;
-  final GlobalKey<VideoAssetPreviewState> _videoKey =
-      GlobalKey<VideoAssetPreviewState>();
+  VideoAssetPreviewState? _videoState;
+  bool _isPreviewSwitching = false;
+  bool _unmountVideoForSwitch = false;
+  int _switchRevision = 0;
+
+  static const Duration _previewSwitchDebounce = Duration(milliseconds: 180);
 
   MediaAssetLibraryConfig get _config {
     return widget.config ?? MediaAssetLibraryScope.of(context);
@@ -71,9 +77,53 @@ class _MediaAssetPreviewDialogState extends State<MediaAssetPreviewDialog> {
     super.dispose();
   }
 
-  void _openAt(int index) {
-    _controller.openAt(index);
+  Future<void> _openAt(int index) async {
+    if (_isPreviewSwitching || !_controller.canNavigate) {
+      return;
+    }
+
+    final nextIndex = (index + _controller.count) % _controller.count;
+    if (nextIndex == _controller.currentIndex) {
+      return;
+    }
+
+    final nextAsset = _controller.assets[nextIndex];
+    final shouldUnmountVideo =
+        _controller.currentAsset.type == MediaAssetType.video;
+    final revision = ++_switchRevision;
+    setState(() {
+      _isPreviewSwitching = true;
+      _unmountVideoForSwitch = shouldUnmountVideo;
+    });
+    await _videoState?.pausePlayback();
+    if (shouldUnmountVideo) {
+      await WidgetsBinding.instance.endOfFrame;
+    }
+
+    if (!mounted || revision != _switchRevision) {
+      return;
+    }
+
+    _controller.openAt(nextIndex);
     _resetImageView();
+    if (_unmountVideoForSwitch) {
+      setState(() => _unmountVideoForSwitch = false);
+    }
+    await WidgetsBinding.instance.endOfFrame;
+    await Future<void>.delayed(_previewSwitchDebounce);
+
+    if (!mounted || revision != _switchRevision) {
+      return;
+    }
+
+    if (nextAsset.type == MediaAssetType.video) {
+      return;
+    }
+
+    setState(() {
+      _isPreviewSwitching = false;
+      _unmountVideoForSwitch = false;
+    });
   }
 
   void _zoomBy(double factor) {
@@ -114,6 +164,10 @@ class _MediaAssetPreviewDialogState extends State<MediaAssetPreviewDialog> {
       return;
     }
 
+    if (_isPreviewSwitching) {
+      return;
+    }
+
     if (asset.type == MediaAssetType.image) {
       if (imageShortcuts.zoomInKeys.contains(key)) {
         _zoomBy(1.25);
@@ -129,37 +183,37 @@ class _MediaAssetPreviewDialogState extends State<MediaAssetPreviewDialog> {
       }
       if (_config.preview.enableNavigation &&
           imageShortcuts.previousKeys.contains(key)) {
-        _openAt(_controller.currentIndex - 1);
+        unawaited(_openAt(_controller.currentIndex - 1));
         return;
       }
       if (_config.preview.enableNavigation &&
           imageShortcuts.nextKeys.contains(key)) {
-        _openAt(_controller.currentIndex + 1);
+        unawaited(_openAt(_controller.currentIndex + 1));
         return;
       }
     }
 
     if (asset.type == MediaAssetType.video) {
       if (videoShortcuts.playPauseKeys.contains(key)) {
-        _videoKey.currentState?.togglePlayback();
+        unawaited(_videoState?.togglePlayback());
         return;
       }
       if (videoShortcuts.seekBackwardKeys.contains(key)) {
-        _videoKey.currentState?.seekBy(-videoShortcuts.seekStep);
+        unawaited(_videoState?.seekBy(-videoShortcuts.seekStep));
         return;
       }
       if (videoShortcuts.seekForwardKeys.contains(key)) {
-        _videoKey.currentState?.seekBy(videoShortcuts.seekStep);
+        unawaited(_videoState?.seekBy(videoShortcuts.seekStep));
         return;
       }
       if (_config.preview.enableNavigation &&
           videoShortcuts.previousKeys.contains(key)) {
-        _openAt(_controller.currentIndex - 1);
+        unawaited(_openAt(_controller.currentIndex - 1));
         return;
       }
       if (_config.preview.enableNavigation &&
           videoShortcuts.nextKeys.contains(key)) {
-        _openAt(_controller.currentIndex + 1);
+        unawaited(_openAt(_controller.currentIndex + 1));
       }
     }
   }
@@ -285,12 +339,26 @@ class _MediaAssetPreviewDialogState extends State<MediaAssetPreviewDialog> {
                   maxScale: MediaAssetPreviewController.maxScale,
                   loadFailureText: _config.text.imageLoadFailureMessage,
                 )
-              : VideoAssetPreview(
-                  key: _videoKey,
-                  asset: asset,
-                  seekStep: _config.preview.videoShortcuts.seekStep,
-                  missingMessage: _config.text.videoMissingMessage,
-                  loadFailureMessage: _config.text.videoLoadFailureMessage,
+              : _unmountVideoForSwitch
+              ? const ColoredBox(color: Colors.black)
+              : KeyedSubtree(
+                  key: ValueKey(asset.filePath),
+                  child: VideoAssetPreview(
+                    asset: asset,
+                    seekStep: _config.preview.videoShortcuts.seekStep,
+                    missingMessage: _config.text.videoMissingMessage,
+                    loadFailureMessage: _config.text.videoLoadFailureMessage,
+                    onStateChanged: (state) {
+                      if (state != null ||
+                          _controller.currentAsset.type !=
+                              MediaAssetType.video) {
+                        _videoState = state;
+                      }
+                    },
+                    onReady: (readyAsset) {
+                      _handlePreviewReady(readyAsset);
+                    },
+                  ),
                 ),
         ),
         if (_config.preview.enableNavigation && _controller.canNavigate) ...[
@@ -302,7 +370,9 @@ class _MediaAssetPreviewDialogState extends State<MediaAssetPreviewDialog> {
               child: _PreviewNavigationButton(
                 icon: Icons.chevron_left_rounded,
                 tooltip: _config.text.previousAssetTooltip,
-                onTap: () => _openAt(_controller.currentIndex - 1),
+                onTap: _isPreviewSwitching
+                    ? null
+                    : () => unawaited(_openAt(_controller.currentIndex - 1)),
               ),
             ),
           ),
@@ -314,13 +384,28 @@ class _MediaAssetPreviewDialogState extends State<MediaAssetPreviewDialog> {
               child: _PreviewNavigationButton(
                 icon: Icons.chevron_right_rounded,
                 tooltip: _config.text.nextAssetTooltip,
-                onTap: () => _openAt(_controller.currentIndex + 1),
+                onTap: _isPreviewSwitching
+                    ? null
+                    : () => unawaited(_openAt(_controller.currentIndex + 1)),
               ),
             ),
           ),
         ],
+        if (_isPreviewSwitching)
+          const Positioned.fill(child: _PreviewSwitchingOverlay()),
       ],
     );
+  }
+
+  void _handlePreviewReady(MediaAsset asset) {
+    if (!_isPreviewSwitching ||
+        asset.filePath != _controller.currentAsset.filePath) {
+      return;
+    }
+    setState(() {
+      _isPreviewSwitching = false;
+      _unmountVideoForSwitch = false;
+    });
   }
 }
 
@@ -411,7 +496,7 @@ class _PreviewActionButton extends StatelessWidget {
 class _PreviewNavigationButton extends StatelessWidget {
   final IconData icon;
   final String tooltip;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _PreviewNavigationButton({
     required this.icon,
@@ -438,8 +523,32 @@ class _PreviewNavigationButton extends StatelessWidget {
               border: Border.all(color: theme.border(context)),
               boxShadow: theme.shadow,
             ),
-            child: Icon(icon, size: 30, color: theme.text(context)),
+            child: Icon(
+              icon,
+              size: 30,
+              color: onTap == null
+                  ? theme.mutedText(context).withValues(alpha: 0.45)
+                  : theme.text(context),
+            ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PreviewSwitchingOverlay extends StatelessWidget {
+  const _PreviewSwitchingOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.24)),
+      child: const Center(
+        child: SizedBox(
+          width: 26,
+          height: 26,
+          child: CircularProgressIndicator(strokeWidth: 2),
         ),
       ),
     );

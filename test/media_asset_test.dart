@@ -990,6 +990,55 @@ void main() {
     expect(find.text('Y'), findsOneWidget);
   });
 
+  testWidgets('locks preview navigation while switching', (tester) async {
+    final assets = [
+      MediaAsset(
+        id: 'asset-1',
+        name: 'asset-1.png',
+        filePath: '/tmp/asset-1.png',
+        type: MediaAssetType.image,
+        fileSize: 0,
+        createdAt: DateTime(2026, 1, 1),
+      ),
+      MediaAsset(
+        id: 'asset-2',
+        name: 'asset-2.png',
+        filePath: '/tmp/asset-2.png',
+        type: MediaAssetType.image,
+        fileSize: 0,
+        createdAt: DateTime(2026, 1, 2),
+      ),
+      MediaAsset(
+        id: 'asset-3',
+        name: 'asset-3.png',
+        filePath: '/tmp/asset-3.png',
+        type: MediaAssetType.image,
+        fileSize: 0,
+        createdAt: DateTime(2026, 1, 3),
+      ),
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaAssetPreviewDialog(asset: assets.first, assets: assets),
+      ),
+    );
+
+    final nextButton = find.byIcon(Icons.chevron_right_rounded);
+    await tester.tap(nextButton);
+    await tester.tap(nextButton);
+    await tester.pump();
+
+    expect(find.text('asset-2.png'), findsOneWidget);
+    expect(find.text('2/3'), findsOneWidget);
+    expect(find.text('asset-3.png'), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 220));
+
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
   testWidgets('drags imported assets to a host drag target', (tester) async {
     MediaAsset? receivedAsset;
     final asset = MediaAsset(

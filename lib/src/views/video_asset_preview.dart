@@ -14,6 +14,8 @@ class VideoAssetPreview extends StatefulWidget {
   final String missingMessage;
   final String loadFailureMessage;
   final bool showControls;
+  final ValueChanged<VideoAssetPreviewState?>? onStateChanged;
+  final ValueChanged<MediaAsset>? onReady;
 
   const VideoAssetPreview({
     super.key,
@@ -22,6 +24,8 @@ class VideoAssetPreview extends StatefulWidget {
     required this.missingMessage,
     required this.loadFailureMessage,
     this.showControls = true,
+    this.onStateChanged,
+    this.onReady,
   });
 
   @override
@@ -35,6 +39,7 @@ class VideoAssetPreviewState extends State<VideoAssetPreview> {
   double _pendingSeekValue = 0;
   String? _errorText;
   int _loadRevision = 0;
+  bool _isDisposed = false;
 
   static bool _isFvpRegistered = false;
 
@@ -42,12 +47,17 @@ class VideoAssetPreviewState extends State<VideoAssetPreview> {
   void initState() {
     super.initState();
     _registerDesktopVideoPlayer();
+    widget.onStateChanged?.call(this);
     unawaited(_openVideo(widget.asset));
   }
 
   @override
   void didUpdateWidget(VideoAssetPreview oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.onStateChanged != widget.onStateChanged) {
+      oldWidget.onStateChanged?.call(null);
+      widget.onStateChanged?.call(this);
+    }
     if (oldWidget.asset.filePath != widget.asset.filePath) {
       unawaited(_openVideo(widget.asset));
     }
@@ -55,9 +65,25 @@ class VideoAssetPreviewState extends State<VideoAssetPreview> {
 
   @override
   void dispose() {
+    _isDisposed = true;
     _loadRevision++;
-    _controller?.dispose();
+    widget.onStateChanged?.call(null);
+    final controller = _controller;
+    _controller = null;
+    unawaited(_disposeControllerSafely(controller));
     super.dispose();
+  }
+
+  Future<void> pausePlayback() async {
+    final controller = _controller;
+    if (controller == null) {
+      return;
+    }
+    try {
+      await controller.pause();
+    } catch (_) {
+      // Native video resources can already be in teardown while switching.
+    }
   }
 
   Future<void> togglePlayback() async {
@@ -91,24 +117,29 @@ class VideoAssetPreviewState extends State<VideoAssetPreview> {
   Future<void> _openVideo(MediaAsset asset) async {
     final revision = ++_loadRevision;
     final previous = _controller;
-    setState(() {
-      _controller = null;
-      _isLoading = true;
-      _errorText = null;
-      _pendingSeekValue = 0;
-      _isSeeking = false;
-    });
-    await previous?.dispose();
+    if (!_isDisposed && mounted) {
+      setState(() {
+        _controller = null;
+        _isLoading = true;
+        _errorText = null;
+        _pendingSeekValue = 0;
+        _isSeeking = false;
+      });
+    }
+
+    await _disposeControllerSafely(previous);
+
+    if (_isDisposed || !mounted || revision != _loadRevision) {
+      return;
+    }
 
     final file = File(asset.filePath);
     if (!file.existsSync()) {
-      if (!mounted || revision != _loadRevision) {
-        return;
-      }
       setState(() {
         _isLoading = false;
         _errorText = widget.missingMessage;
       });
+      _notifyReady(asset);
       return;
     }
 
@@ -117,19 +148,20 @@ class VideoAssetPreviewState extends State<VideoAssetPreview> {
       await controller.initialize().timeout(const Duration(seconds: 12));
       await controller.setLooping(false);
     } catch (_) {
-      await controller.dispose();
-      if (!mounted || revision != _loadRevision) {
+      await _disposeControllerSafely(controller);
+      if (_isDisposed || !mounted || revision != _loadRevision) {
         return;
       }
       setState(() {
         _isLoading = false;
         _errorText = widget.loadFailureMessage;
       });
+      _notifyReady(asset);
       return;
     }
 
-    if (!mounted || revision != _loadRevision) {
-      await controller.dispose();
+    if (_isDisposed || !mounted || revision != _loadRevision) {
+      await _disposeControllerSafely(controller);
       return;
     }
 
@@ -137,7 +169,38 @@ class VideoAssetPreviewState extends State<VideoAssetPreview> {
       _controller = controller;
       _isLoading = false;
     });
+    _notifyReady(asset);
     unawaited(controller.play().catchError((_) {}));
+  }
+
+  Future<void> _disposeControllerSafely(
+    VideoPlayerController? controller,
+  ) async {
+    if (controller == null) {
+      return;
+    }
+
+    try {
+      await controller.pause();
+    } catch (_) {
+      // Ignore native teardown races.
+    }
+
+    await WidgetsBinding.instance.endOfFrame;
+    await Future<void>.delayed(const Duration(milliseconds: 16));
+
+    try {
+      await controller.dispose();
+    } catch (_) {
+      // Ignore native teardown races.
+    }
+  }
+
+  void _notifyReady(MediaAsset asset) {
+    if (_isDisposed || !mounted || asset.filePath != widget.asset.filePath) {
+      return;
+    }
+    widget.onReady?.call(asset);
   }
 
   Future<void> _seekTo(double milliseconds) async {
@@ -242,7 +305,10 @@ class VideoAssetPreviewState extends State<VideoAssetPreview> {
         return Center(
           child: AspectRatio(
             aspectRatio: aspectRatio,
-            child: VideoPlayer(controller),
+            child: VideoPlayer(
+              controller,
+              key: ValueKey(widget.asset.filePath),
+            ),
           ),
         );
       },
