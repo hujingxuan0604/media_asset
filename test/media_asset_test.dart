@@ -12,6 +12,24 @@ Finder findAssetDrag(String assetId) {
   });
 }
 
+class _StatefulAssetTile extends StatefulWidget {
+  final MediaAsset asset;
+
+  const _StatefulAssetTile({required this.asset});
+
+  @override
+  State<_StatefulAssetTile> createState() => _StatefulAssetTileState();
+}
+
+class _StatefulAssetTileState extends State<_StatefulAssetTile> {
+  late final String initialAssetId = widget.asset.id;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text('$initialAssetId:${widget.asset.id}');
+  }
+}
+
 void main() {
   test(
     'skips duplicate imports by provided content hash when enabled',
@@ -374,6 +392,71 @@ void main() {
 
     expect(findAssetDrag('asset'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('preserves tile state for remaining assets after deletion', (
+    tester,
+  ) async {
+    var assets = [
+      MediaAsset(
+        id: 'asset-a',
+        name: 'a.png',
+        filePath: '/tmp/a.png',
+        type: MediaAssetType.image,
+        fileSize: 0,
+        createdAt: DateTime(2026, 1, 1),
+      ),
+      MediaAsset(
+        id: 'asset-b',
+        name: 'b.png',
+        filePath: '/tmp/b.png',
+        type: MediaAssetType.image,
+        fileSize: 0,
+        createdAt: DateTime(2026, 1, 2),
+      ),
+      MediaAsset(
+        id: 'asset-c',
+        name: 'c.png',
+        filePath: '/tmp/c.png',
+        type: MediaAssetType.image,
+        fileSize: 0,
+        createdAt: DateTime(2026, 1, 3),
+      ),
+    ];
+
+    Widget buildLibrary() {
+      return MaterialApp(
+        home: Scaffold(
+          body: MediaAssetLibrary(
+            config: const MediaAssetLibraryConfig(
+              layout: MediaAssetLayoutConfig(
+                showToolbar: false,
+                sortMode: MediaAssetSortMode.manual,
+              ),
+              interaction: MediaAssetInteractionConfig(
+                enableAssetDragging: false,
+              ),
+            ),
+            assets: assets,
+            tileBuilder: (context, asset, state) =>
+                _StatefulAssetTile(asset: asset),
+          ),
+        ),
+      );
+    }
+
+    await tester.pumpWidget(buildLibrary());
+
+    expect(find.text('asset-a:asset-a'), findsOneWidget);
+    expect(find.text('asset-b:asset-b'), findsOneWidget);
+    expect(find.text('asset-c:asset-c'), findsOneWidget);
+
+    assets = assets.skip(1).toList(growable: false);
+    await tester.pumpWidget(buildLibrary());
+
+    expect(find.text('asset-a:asset-b'), findsNothing);
+    expect(find.text('asset-b:asset-b'), findsOneWidget);
+    expect(find.text('asset-c:asset-c'), findsOneWidget);
   });
 
   testWidgets('passes tile extent to custom tiles', (tester) async {

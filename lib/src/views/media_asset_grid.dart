@@ -43,6 +43,10 @@ class MediaAssetGrid extends StatelessWidget {
     final layout = config.layout;
     final itemHeight =
         layout.tilePreviewHeight + layout.tilePadding.vertical + 8;
+    final assetIndexByKey = <Key, int>{
+      for (final entry in assets.asMap().entries)
+        ValueKey<String>(entry.value.id): entry.key,
+    };
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -63,6 +67,7 @@ class MediaAssetGrid extends StatelessWidget {
           physics: config.layout.shrinkWrap
               ? const NeverScrollableScrollPhysics()
               : null,
+          findChildIndexCallback: (key) => assetIndexByKey[key],
           padding: const EdgeInsets.only(top: 4, right: 2, bottom: 12),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
@@ -83,6 +88,7 @@ class MediaAssetGrid extends StatelessWidget {
     MediaAsset asset,
     double tileExtent,
   ) {
+    final tileKey = ValueKey<String>(asset.id);
     final interaction = config.interaction;
     final state = MediaAssetTileState(
       isBatchSelected: selectedAssetIds.contains(asset.id),
@@ -92,20 +98,22 @@ class MediaAssetGrid extends StatelessWidget {
     );
     final customTile = tileBuilder?.call(context, asset, state);
     if (customTile != null) {
+      final keyedTile = KeyedSubtree(key: tileKey, child: customTile);
       if (!config.interaction.enableAssetDragging) {
-        return customTile;
+        return keyedTile;
       }
 
       return Draggable<MediaAsset>(
+        key: tileKey,
         data: asset,
-        feedback:
-            dragFeedbackBuilder?.call(context, asset, state) ?? customTile,
-        childWhenDragging: customTile,
-        child: customTile,
+        feedback: dragFeedbackBuilder?.call(context, asset, state) ?? keyedTile,
+        childWhenDragging: keyedTile,
+        child: keyedTile,
       );
     }
 
     return MediaAssetTile(
+      key: tileKey,
       asset: asset,
       state: state,
       onTap: () => onTapAsset(asset),
