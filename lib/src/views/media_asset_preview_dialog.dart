@@ -103,8 +103,8 @@ class _MediaAssetPreviewDialogState extends State<MediaAssetPreviewDialog> {
 
     final key = event.logicalKey;
     final asset = _controller.currentAsset;
-    final imageShortcuts = _config.imageShortcuts;
-    final videoShortcuts = _config.videoShortcuts;
+    final imageShortcuts = _config.preview.imageShortcuts;
+    final videoShortcuts = _config.preview.videoShortcuts;
     final closeKeys = asset.type == MediaAssetType.image
         ? imageShortcuts.closeKeys
         : videoShortcuts.closeKeys;
@@ -127,12 +127,12 @@ class _MediaAssetPreviewDialogState extends State<MediaAssetPreviewDialog> {
         _resetImageView();
         return;
       }
-      if (_config.enablePreviewNavigation &&
+      if (_config.preview.enableNavigation &&
           imageShortcuts.previousKeys.contains(key)) {
         _openAt(_controller.currentIndex - 1);
         return;
       }
-      if (_config.enablePreviewNavigation &&
+      if (_config.preview.enableNavigation &&
           imageShortcuts.nextKeys.contains(key)) {
         _openAt(_controller.currentIndex + 1);
         return;
@@ -152,12 +152,12 @@ class _MediaAssetPreviewDialogState extends State<MediaAssetPreviewDialog> {
         _videoKey.currentState?.seekBy(videoShortcuts.seekStep);
         return;
       }
-      if (_config.enablePreviewNavigation &&
+      if (_config.preview.enableNavigation &&
           videoShortcuts.previousKeys.contains(key)) {
         _openAt(_controller.currentIndex - 1);
         return;
       }
-      if (_config.enablePreviewNavigation &&
+      if (_config.preview.enableNavigation &&
           videoShortcuts.nextKeys.contains(key)) {
         _openAt(_controller.currentIndex + 1);
       }
@@ -236,6 +236,8 @@ class _MediaAssetPreviewDialogState extends State<MediaAssetPreviewDialog> {
                   imageScale: asset.type == MediaAssetType.image
                       ? _controller.imageScale
                       : null,
+                  imagePreviewLabel: _config.text.imagePreviewLabel,
+                  videoPreviewLabel: _config.text.videoPreviewLabel,
                 ),
               ],
             ),
@@ -244,26 +246,26 @@ class _MediaAssetPreviewDialogState extends State<MediaAssetPreviewDialog> {
           if (asset.type == MediaAssetType.image) ...[
             _PreviewActionButton(
               icon: Icons.remove,
-              tooltip: '缩小',
+              tooltip: _config.text.zoomOutTooltip,
               onTap: () => _zoomBy(0.8),
             ),
             const SizedBox(width: 6),
             _PreviewActionButton(
               icon: Icons.add,
-              tooltip: '放大',
+              tooltip: _config.text.zoomInTooltip,
               onTap: () => _zoomBy(1.25),
             ),
             const SizedBox(width: 6),
             _PreviewActionButton(
               icon: Icons.center_focus_strong,
-              tooltip: '重置',
+              tooltip: _config.text.resetZoomTooltip,
               onTap: _resetImageView,
             ),
           ],
           const SizedBox(width: 6),
           _PreviewActionButton(
             icon: Icons.close,
-            tooltip: '关闭',
+            tooltip: _config.text.closePreviewTooltip,
             onTap: () => Navigator.of(context).pop(),
           ),
         ],
@@ -281,14 +283,17 @@ class _MediaAssetPreviewDialogState extends State<MediaAssetPreviewDialog> {
                   transformationController: _transformationController,
                   minScale: MediaAssetPreviewController.minScale,
                   maxScale: MediaAssetPreviewController.maxScale,
+                  loadFailureText: _config.text.imageLoadFailureMessage,
                 )
               : VideoAssetPreview(
                   key: _videoKey,
                   asset: asset,
-                  seekStep: _config.videoShortcuts.seekStep,
+                  seekStep: _config.preview.videoShortcuts.seekStep,
+                  missingMessage: _config.text.videoMissingMessage,
+                  loadFailureMessage: _config.text.videoLoadFailureMessage,
                 ),
         ),
-        if (_config.enablePreviewNavigation && _controller.canNavigate) ...[
+        if (_config.preview.enableNavigation && _controller.canNavigate) ...[
           Positioned(
             left: 14,
             top: 0,
@@ -296,7 +301,7 @@ class _MediaAssetPreviewDialogState extends State<MediaAssetPreviewDialog> {
             child: Center(
               child: _PreviewNavigationButton(
                 icon: Icons.chevron_left_rounded,
-                tooltip: '上一个素材',
+                tooltip: _config.text.previousAssetTooltip,
                 onTap: () => _openAt(_controller.currentIndex - 1),
               ),
             ),
@@ -308,7 +313,7 @@ class _MediaAssetPreviewDialogState extends State<MediaAssetPreviewDialog> {
             child: Center(
               child: _PreviewNavigationButton(
                 icon: Icons.chevron_right_rounded,
-                tooltip: '下一个素材',
+                tooltip: _config.text.nextAssetTooltip,
                 onTap: () => _openAt(_controller.currentIndex + 1),
               ),
             ),
@@ -324,18 +329,26 @@ class _PreviewHeaderMeta extends StatelessWidget {
   final int index;
   final int count;
   final double? imageScale;
+  final String imagePreviewLabel;
+  final String videoPreviewLabel;
 
   const _PreviewHeaderMeta({
     required this.asset,
     required this.index,
     required this.count,
     required this.imageScale,
+    required this.imagePreviewLabel,
+    required this.videoPreviewLabel,
   });
 
   @override
   Widget build(BuildContext context) {
     final parts = <Widget>[
-      _PreviewMetaText(asset.type == MediaAssetType.video ? '视频预览' : '图片预览'),
+      _PreviewMetaText(
+        asset.type == MediaAssetType.video
+            ? videoPreviewLabel
+            : imagePreviewLabel,
+      ),
       const _PreviewMetaDivider(),
       _PreviewMetaText(const MediaFileSizeFormatter().format(asset.fileSize)),
       const _PreviewMetaDivider(),

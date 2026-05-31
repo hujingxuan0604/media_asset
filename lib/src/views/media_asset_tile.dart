@@ -1,11 +1,13 @@
-import 'dart:io';
+import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
 import '../config/media_asset_config.dart';
 import '../models/media_asset_models.dart';
-import '../services/media_file_size_formatter.dart';
 import '../theme/media_asset_theme.dart';
+import 'media_asset_context_menu.dart';
+import 'media_asset_tile_preview.dart';
 
 typedef MediaAssetTileBuilder =
     Widget Function(
@@ -22,84 +24,31 @@ typedef MediaAssetMenuBuilder =
       MediaAssetMenuController controller,
     );
 
-class MediaAssetMenuController {
-  final Offset position;
-  final bool canSelect;
-  final bool canDownload;
-  final bool canDelete;
-  final VoidCallback _onClose;
-  final ValueChanged<MediaAssetAction> _onAction;
-
-  const MediaAssetMenuController._({
-    required this.position,
-    required this.canSelect,
-    required this.canDownload,
-    required this.canDelete,
-    required VoidCallback onClose,
-    required ValueChanged<MediaAssetAction> onAction,
-  }) : _onClose = onClose,
-       _onAction = onAction;
-
-  void close() => _onClose();
-
-  void preview() => _onAction(MediaAssetAction.preview);
-
-  void select() {
-    if (canSelect) {
-      _onAction(MediaAssetAction.select);
-    }
-  }
-
-  void download() {
-    if (canDownload) {
-      _onAction(MediaAssetAction.download);
-    }
-  }
-
-  void delete() {
-    if (canDelete) {
-      _onAction(MediaAssetAction.delete);
-    }
-  }
-
-  void perform(MediaAssetAction action) {
-    switch (action) {
-      case MediaAssetAction.preview:
-        preview();
-        break;
-      case MediaAssetAction.select:
-        select();
-        break;
-      case MediaAssetAction.download:
-        download();
-        break;
-      case MediaAssetAction.delete:
-        delete();
-        break;
-    }
-  }
-}
-
 class MediaAssetTileState {
   final bool isSelected;
   final bool isBatchSelected;
+  final int duplicateHighlightToken;
+  final double? tileExtent;
   final MediaAssetLibraryConfig config;
 
   const MediaAssetTileState({
     required this.isSelected,
     required this.isBatchSelected,
     required this.config,
+    this.duplicateHighlightToken = 0,
+    this.tileExtent,
   });
 }
 
-class MediaAssetTile extends StatelessWidget {
+class MediaAssetTile extends StatefulWidget {
   final MediaAsset asset;
   final MediaAssetTileState state;
   final VoidCallback onTap;
-  final VoidCallback onDoubleTap;
+  final VoidCallback? onDoubleTap;
   final VoidCallback? onToggleSelection;
   final VoidCallback? onDelete;
-  final VoidCallback? onDownload;
+  final VoidCallback? onRevealInFolder;
+  final VoidCallback? onCopyPath;
   final MediaAssetMenuBuilder? menuBuilder;
 
   const MediaAssetTile({
@@ -110,102 +59,203 @@ class MediaAssetTile extends StatelessWidget {
     required this.onDoubleTap,
     this.onToggleSelection,
     this.onDelete,
-    this.onDownload,
+    this.onRevealInFolder,
+    this.onCopyPath,
     this.menuBuilder,
   });
 
   @override
+  State<MediaAssetTile> createState() => _MediaAssetTileState();
+}
+
+class _MediaAssetTileState extends State<MediaAssetTile>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _duplicateHighlightController;
+  Timer? _hideDeleteTimer;
+  bool _isPreviewHovering = false;
+  bool _isDeleteHovering = false;
+
+  bool get _showDeleteButton =>
+      widget.onDelete != null && (_isPreviewHovering || _isDeleteHovering);
+
+  @override
+  void initState() {
+    super.initState();
+    _duplicateHighlightController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    if (widget.state.duplicateHighlightToken > 0) {
+      _startDuplicateHighlight();
+    }
+  }
+
+  @override
+  void didUpdateWidget(MediaAssetTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.state.duplicateHighlightToken > 0 &&
+        widget.state.duplicateHighlightToken !=
+            oldWidget.state.duplicateHighlightToken) {
+      _startDuplicateHighlight();
+    }
+  }
+
+  @override
+  void dispose() {
+    _duplicateHighlightController.dispose();
+    _hideDeleteTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = MediaAssetTheme.of(context);
-    final highlight = state.isSelected || state.isBatchSelected;
-    final canShowMenu = state.config.enableContextMenu && menuBuilder != null;
+    final highlight = widget.state.isSelected || widget.state.isBatchSelected;
+    final canShowMenu = widget.state.config.interaction.enableContextMenu;
 
-    return SizedBox(
-      width: state.config.tileWidth,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: onTap,
-              onDoubleTap: onDoubleTap,
-              onSecondaryTapDown: canShowMenu
-                  ? (details) =>
-                        _showContextMenu(context, details.globalPosition)
-                  : null,
-              borderRadius: theme.borderRadius,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 140),
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: highlight
-                      ? theme.primary(context).withValues(alpha: 0.08)
-                      : theme.elevatedSurface(context),
+    return AnimatedBuilder(
+      animation: _duplicateHighlightController,
+      builder: (context, child) {
+        final baseBorderColor = highlight
+            ? theme.primary(context)
+            : theme.border(context);
+        final pulse = _duplicateHighlightPulse;
+        final borderColor = Color.lerp(
+          baseBorderColor,
+          theme.primary(context),
+          pulse,
+        )!;
+        final borderWidth = (highlight ? 1.4 : 1.0) + pulse * 2.2;
+        final layout = widget.state.config.layout;
+
+        return SizedBox(
+          width: widget.state.tileExtent ?? layout.tileWidth,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: widget.onTap,
+                  onDoubleTap: widget.onDoubleTap,
+                  onSecondaryTapDown: canShowMenu
+                      ? (details) =>
+                            _showContextMenu(context, details.globalPosition)
+                      : null,
                   borderRadius: theme.borderRadius,
-                  border: Border.all(
-                    color: highlight
-                        ? theme.primary(context)
-                        : theme.border(context),
-                    width: highlight ? 1.4 : 1,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _AssetPreviewFrame(
-                      asset: asset,
-                      height: state.config.tilePreviewHeight,
-                      selected: state.isBatchSelected,
-                      onToggleSelection: state.config.enableMultiSelection
-                          ? onToggleSelection
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 140),
+                    padding: layout.tilePadding,
+                    decoration: BoxDecoration(
+                      color: highlight
+                          ? theme.primary(context).withValues(alpha: 0.08)
+                          : theme.elevatedSurface(context),
+                      borderRadius: theme.borderRadius,
+                      border: Border.all(
+                        color: borderColor,
+                        width: borderWidth,
+                      ),
+                      boxShadow: pulse > 0
+                          ? [
+                              BoxShadow(
+                                color: theme
+                                    .primary(context)
+                                    .withValues(alpha: 0.26 * pulse),
+                                blurRadius: 14 * pulse,
+                                spreadRadius: 1.6 * pulse,
+                              ),
+                            ]
                           : null,
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      asset.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: theme.text(context),
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      const MediaFileSizeFormatter().format(asset.fileSize),
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: theme.mutedText(context),
-                      ),
-                    ),
-                  ],
+                    child: _buildGridContent(layout),
+                  ),
                 ),
               ),
-            ),
+              if (_showDeleteButton)
+                Positioned(
+                  top: -5,
+                  right: -5,
+                  child: MouseRegion(
+                    onEnter: (_) => _handleDeleteHoverChanged(true),
+                    onExit: (_) => _handleDeleteHoverChanged(false),
+                    child: _FloatingActionBadge(
+                      icon: Icons.close_rounded,
+                      tooltip: widget.state.config.text.deleteAssetTooltip,
+                      onTap: widget.onDelete,
+                      size: 22,
+                      iconSize: 14,
+                    ),
+                  ),
+                ),
+            ],
           ),
-          if (onDelete != null)
-            Positioned(
-              top: -6,
-              right: -6,
-              child: _FloatingActionBadge(
-                icon: Icons.close_rounded,
-                tooltip: '删除素材',
-                onTap: onDelete,
-              ),
-            ),
-        ],
+        );
+      },
+    );
+  }
+
+  Widget _buildGridContent(MediaAssetLayoutConfig layout) {
+    return MouseRegion(
+      onEnter: (_) => _handlePreviewHoverChanged(true),
+      onExit: (_) => _handlePreviewHoverChanged(false),
+      child: MediaAssetTilePreview(
+        asset: widget.asset,
+        height: layout.tilePreviewHeight,
+        selected: widget.state.isBatchSelected,
+        showMetadata: _isPreviewHovering,
+        onToggleSelection: widget.state.config.interaction.enableMultiSelection
+            ? widget.onToggleSelection
+            : null,
       ),
     );
   }
 
-  Future<void> _showContextMenu(BuildContext context, Offset position) async {
-    final builder = menuBuilder;
-    if (builder == null) {
+  double get _duplicateHighlightPulse {
+    final value = _duplicateHighlightController.value;
+    return (1 - math.cos(value * math.pi * 6)) / 2;
+  }
+
+  void _startDuplicateHighlight() {
+    _duplicateHighlightController.forward(from: 0);
+  }
+
+  void _handlePreviewHoverChanged(bool isHovering) {
+    if (isHovering) {
+      _hideDeleteTimer?.cancel();
+      if (!_isPreviewHovering) {
+        setState(() => _isPreviewHovering = true);
+      }
       return;
     }
 
+    _isPreviewHovering = false;
+    _scheduleDeleteButtonHide();
+  }
+
+  void _handleDeleteHoverChanged(bool isHovering) {
+    if (isHovering) {
+      _hideDeleteTimer?.cancel();
+      if (!_isDeleteHovering) {
+        setState(() => _isDeleteHovering = true);
+      }
+      return;
+    }
+
+    _isDeleteHovering = false;
+    _scheduleDeleteButtonHide();
+  }
+
+  void _scheduleDeleteButtonHide() {
+    _hideDeleteTimer?.cancel();
+    _hideDeleteTimer = Timer(const Duration(milliseconds: 120), () {
+      if (!mounted || _isPreviewHovering || _isDeleteHovering) {
+        return;
+      }
+      setState(() {});
+    });
+  }
+
+  Future<void> _showContextMenu(BuildContext context, Offset position) async {
     final barrierLabel = MaterialLocalizations.of(
       context,
     ).modalBarrierDismissLabel;
@@ -218,27 +268,38 @@ class MediaAssetTile extends StatelessWidget {
       transitionDuration: Duration.zero,
       pageBuilder: (dialogContext, animation, secondaryAnimation) {
         final navigator = Navigator.of(dialogContext);
-        final controller = MediaAssetMenuController._(
+        final controller = MediaAssetMenuController(
           position: position,
-          canSelect: onToggleSelection != null,
-          canDownload: onDownload != null,
-          canDelete: onDelete != null,
+          canPreview: widget.onDoubleTap != null,
+          canSelect: widget.onToggleSelection != null,
+          canRevealInFolder: widget.onRevealInFolder != null,
+          canCopyPath: widget.onCopyPath != null,
+          canDelete: widget.onDelete != null,
           onClose: () => navigator.pop(),
           onAction: (action) {
             navigator.pop();
-            _handleMenuAction(action);
+            _handleMenuAction(context, action);
           },
         );
+        final menu =
+            widget.menuBuilder?.call(
+              dialogContext,
+              widget.asset,
+              widget.state,
+              controller,
+            ) ??
+            DefaultMediaAssetContextMenu(
+              isBatchSelected: widget.state.isBatchSelected,
+              controller: controller,
+              config: widget.state.config,
+            );
 
         return Stack(
           children: [
             Positioned(
               left: position.dx,
               top: position.dy,
-              child: Material(
-                type: MaterialType.transparency,
-                child: builder(dialogContext, asset, state, controller),
-              ),
+              child: Material(type: MaterialType.transparency, child: menu),
             ),
           ],
         );
@@ -246,180 +307,24 @@ class MediaAssetTile extends StatelessWidget {
     );
   }
 
-  void _handleMenuAction(MediaAssetAction action) {
+  void _handleMenuAction(BuildContext context, MediaAssetAction action) {
     switch (action) {
       case MediaAssetAction.preview:
-        onDoubleTap();
+        widget.onDoubleTap?.call();
         break;
       case MediaAssetAction.select:
-        onToggleSelection?.call();
+        widget.onToggleSelection?.call();
         break;
-      case MediaAssetAction.download:
-        onDownload?.call();
+      case MediaAssetAction.revealInFolder:
+        widget.onRevealInFolder?.call();
+        break;
+      case MediaAssetAction.copyPath:
+        widget.onCopyPath?.call();
         break;
       case MediaAssetAction.delete:
-        onDelete?.call();
+        widget.onDelete?.call();
         break;
     }
-  }
-}
-
-class _AssetPreviewFrame extends StatelessWidget {
-  final MediaAsset asset;
-  final double height;
-  final bool selected;
-  final VoidCallback? onToggleSelection;
-
-  const _AssetPreviewFrame({
-    required this.asset,
-    required this.height,
-    required this.selected,
-    required this.onToggleSelection,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = MediaAssetTheme.of(context);
-
-    return Stack(
-      children: [
-        Container(
-          height: height,
-          width: double.infinity,
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: theme.surface(context),
-            borderRadius: BorderRadius.circular(7),
-          ),
-          child: asset.type == MediaAssetType.image
-              ? _ImageThumb(asset: asset)
-              : _VideoThumb(asset: asset),
-        ),
-        if (asset.type == MediaAssetType.video)
-          Positioned(
-            left: 6,
-            top: 6,
-            child: _TypeBadge(label: asset.type.label),
-          ),
-        if (onToggleSelection != null)
-          Positioned(
-            top: 5,
-            right: 5,
-            child: _SelectionBadge(
-              selected: selected,
-              onTap: onToggleSelection,
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _ImageThumb extends StatelessWidget {
-  final MediaAsset asset;
-
-  const _ImageThumb({required this.asset});
-
-  @override
-  Widget build(BuildContext context) {
-    final sourcePath = asset.thumbnailPath ?? asset.filePath;
-    final file = File(sourcePath);
-    if (!file.existsSync()) {
-      return const _BrokenPreview(icon: Icons.broken_image_outlined);
-    }
-    return Image.file(
-      file,
-      fit: BoxFit.cover,
-      gaplessPlayback: true,
-      errorBuilder: (context, error, stackTrace) {
-        return const _BrokenPreview(icon: Icons.broken_image_outlined);
-      },
-    );
-  }
-}
-
-class _VideoThumb extends StatelessWidget {
-  final MediaAsset asset;
-
-  const _VideoThumb({required this.asset});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = MediaAssetTheme.of(context);
-    final thumbnailPath = asset.thumbnailPath;
-
-    if (thumbnailPath != null && File(thumbnailPath).existsSync()) {
-      return Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.file(File(thumbnailPath), fit: BoxFit.cover),
-          const Center(
-            child: Icon(Icons.play_circle_fill, color: Colors.white),
-          ),
-        ],
-      );
-    }
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            theme.primary(context).withValues(alpha: 0.18),
-            theme.elevatedSurface(context),
-          ],
-        ),
-      ),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Icon(
-            Icons.play_circle_outline_rounded,
-            size: 32,
-            color: theme.text(context),
-          ),
-          Positioned(
-            right: 6,
-            bottom: 6,
-            child: _TypeBadge(label: asset.extensionLabel),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SelectionBadge extends StatelessWidget {
-  final bool selected;
-  final VoidCallback? onTap;
-
-  const _SelectionBadge({required this.selected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: selected ? '取消选择' : '选择',
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Container(
-          width: 22,
-          height: 22,
-          decoration: BoxDecoration(
-            color: selected
-                ? MediaAssetTheme.of(context).primary(context)
-                : Colors.black.withValues(alpha: 0.45),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            selected ? Icons.check_rounded : Icons.add_rounded,
-            size: 14,
-            color: Colors.white,
-          ),
-        ),
-      ),
-    );
   }
 }
 
@@ -427,11 +332,15 @@ class _FloatingActionBadge extends StatelessWidget {
   final IconData icon;
   final String tooltip;
   final VoidCallback? onTap;
+  final double size;
+  final double iconSize;
 
   const _FloatingActionBadge({
     required this.icon,
     required this.tooltip,
     required this.onTap,
+    this.size = 24,
+    this.iconSize = 14,
   });
 
   @override
@@ -439,62 +348,24 @@ class _FloatingActionBadge extends StatelessWidget {
     final theme = MediaAssetTheme.of(context);
     return Tooltip(
       message: tooltip,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(999),
+      child: MouseRegion(
+        cursor: onTap == null ? MouseCursor.defer : SystemMouseCursors.click,
+        child: Listener(
+          behavior: HitTestBehavior.opaque,
+          onPointerDown: onTap == null ? null : (_) => onTap!(),
           child: Container(
-            width: 24,
-            height: 24,
+            width: size,
+            height: size,
             decoration: BoxDecoration(
               color: theme.surface(context),
               shape: BoxShape.circle,
               border: Border.all(color: theme.border(context)),
               boxShadow: theme.shadow,
             ),
-            child: Icon(icon, size: 14, color: theme.mutedText(context)),
+            child: Icon(icon, size: iconSize, color: theme.mutedText(context)),
           ),
         ),
       ),
-    );
-  }
-}
-
-class _TypeBadge extends StatelessWidget {
-  final String label;
-
-  const _TypeBadge({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.56),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 9,
-          fontWeight: FontWeight.w700,
-          color: Colors.white,
-        ),
-      ),
-    );
-  }
-}
-
-class _BrokenPreview extends StatelessWidget {
-  final IconData icon;
-
-  const _BrokenPreview({required this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Icon(icon, color: MediaAssetTheme.of(context).mutedText(context)),
     );
   }
 }

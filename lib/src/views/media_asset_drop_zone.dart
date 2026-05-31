@@ -50,7 +50,7 @@ class _MediaAssetDropZoneState extends State<MediaAssetDropZone> {
             Positioned.fill(
               child: IgnorePointer(
                 child: _DropOverlay(
-                  title: widget.config.dropActiveTitle,
+                  title: widget.config.text.dropActiveTitle,
                   compact: widget.hasAssets,
                 ),
               ),
@@ -110,7 +110,7 @@ class MediaAssetEmptyDropZone extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            isActive ? config.dropActiveTitle : config.emptyTitle,
+            isActive ? config.text.dropActiveTitle : config.text.emptyTitle,
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 15,
@@ -120,7 +120,7 @@ class MediaAssetEmptyDropZone extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            config.emptyDescription,
+            config.text.emptyDescription,
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 12,
@@ -133,7 +133,7 @@ class MediaAssetEmptyDropZone extends StatelessWidget {
             FilledButton.icon(
               onPressed: onAddPressed,
               icon: const Icon(Icons.add_photo_alternate_outlined, size: 16),
-              label: const Text('导入素材'),
+              label: Text(config.text.importButtonLabel),
             ),
           ],
         ],
@@ -173,7 +173,7 @@ class _DropOverlay extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.file_download_outlined, color: theme.primary(context)),
+              Icon(Icons.file_open_outlined, color: theme.primary(context)),
               const SizedBox(width: 8),
               Text(
                 title,

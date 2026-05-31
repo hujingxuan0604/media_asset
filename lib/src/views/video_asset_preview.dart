@@ -11,12 +11,16 @@ import '../theme/media_asset_theme.dart';
 class VideoAssetPreview extends StatefulWidget {
   final MediaAsset asset;
   final Duration seekStep;
+  final String missingMessage;
+  final String loadFailureMessage;
   final bool showControls;
 
   const VideoAssetPreview({
     super.key,
     required this.asset,
     required this.seekStep,
+    required this.missingMessage,
+    required this.loadFailureMessage,
     this.showControls = true,
   });
 
@@ -103,7 +107,7 @@ class VideoAssetPreviewState extends State<VideoAssetPreview> {
       }
       setState(() {
         _isLoading = false;
-        _errorText = '视频文件不存在，无法预览';
+        _errorText = widget.missingMessage;
       });
       return;
     }
@@ -119,7 +123,7 @@ class VideoAssetPreviewState extends State<VideoAssetPreview> {
       }
       setState(() {
         _isLoading = false;
-        _errorText = '视频加载失败，请检查文件是否可用';
+        _errorText = widget.loadFailureMessage;
       });
       return;
     }
@@ -221,7 +225,7 @@ class VideoAssetPreviewState extends State<VideoAssetPreview> {
         if (value.hasError) {
           return Center(
             child: Text(
-              value.errorDescription ?? '视频加载失败，请检查文件是否可用',
+              value.errorDescription ?? widget.loadFailureMessage,
               style: TextStyle(
                 fontSize: 13,
                 color: Colors.white.withValues(alpha: 0.86),

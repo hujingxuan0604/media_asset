@@ -10,6 +10,7 @@ class ImageAssetPreview extends StatelessWidget {
   final TransformationController transformationController;
   final double minScale;
   final double maxScale;
+  final String loadFailureText;
 
   const ImageAssetPreview({
     super.key,
@@ -17,6 +18,7 @@ class ImageAssetPreview extends StatelessWidget {
     required this.transformationController,
     required this.minScale,
     required this.maxScale,
+    required this.loadFailureText,
   });
 
   @override
@@ -45,10 +47,10 @@ class ImageAssetPreview extends StatelessWidget {
                     file,
                     fit: BoxFit.contain,
                     errorBuilder: (context, error, stackTrace) {
-                      return const _ImageLoadFailure();
+                      return _ImageLoadFailure(message: loadFailureText);
                     },
                   )
-                : const _ImageLoadFailure(),
+                : _ImageLoadFailure(message: loadFailureText),
           ),
         ),
       ),
@@ -57,7 +59,9 @@ class ImageAssetPreview extends StatelessWidget {
 }
 
 class _ImageLoadFailure extends StatelessWidget {
-  const _ImageLoadFailure();
+  final String message;
+
+  const _ImageLoadFailure({required this.message});
 
   @override
   Widget build(BuildContext context) {
@@ -72,7 +76,7 @@ class _ImageLoadFailure extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          '图片加载失败',
+          message,
           style: TextStyle(fontSize: 12, color: theme.mutedText(context)),
         ),
       ],

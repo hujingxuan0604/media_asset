@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../config/media_asset_config.dart';
+import '../models/media_asset_models.dart';
 import '../theme/media_asset_theme.dart';
 
 class MediaAssetToolbar extends StatelessWidget {
@@ -12,7 +13,7 @@ class MediaAssetToolbar extends StatelessWidget {
   final VoidCallback? onAddPressed;
   final VoidCallback? onSelectAll;
   final VoidCallback? onClearSelection;
-  final VoidCallback? onDownloadSelected;
+  final VoidCallback? onCopySelectedPaths;
   final VoidCallback? onDeleteSelected;
 
   const MediaAssetToolbar({
@@ -25,14 +26,17 @@ class MediaAssetToolbar extends StatelessWidget {
     this.onAddPressed,
     this.onSelectAll,
     this.onClearSelection,
-    this.onDownloadSelected,
+    this.onCopySelectedPaths,
     this.onDeleteSelected,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = MediaAssetTheme.of(context);
-    final canSelect = config.enableMultiSelection && assetCount > 0;
+    final canSelect =
+        config.interaction.enableMultiSelection &&
+        config.interaction.isActionEnabled(MediaAssetAction.select) &&
+        assetCount > 0;
 
     return Row(
       children: [
@@ -62,14 +66,14 @@ class MediaAssetToolbar extends StatelessWidget {
         ),
         if (selectedCount > 0) ...[
           _ToolbarIconButton(
-            icon: Icons.file_download_outlined,
-            tooltip: '下载所选',
-            onTap: onDownloadSelected,
+            icon: Icons.content_copy_outlined,
+            tooltip: config.text.copySelectedPathsTooltip,
+            onTap: onCopySelectedPaths,
           ),
           const SizedBox(width: 8),
           _ToolbarIconButton(
             icon: Icons.delete_outline_rounded,
-            tooltip: '删除所选',
+            tooltip: config.text.deleteSelectedTooltip,
             onTap: onDeleteSelected,
             color: theme.danger(context),
           ),
@@ -80,14 +84,16 @@ class MediaAssetToolbar extends StatelessWidget {
             icon: allSelected
                 ? Icons.check_box_outlined
                 : Icons.check_box_outline_blank_outlined,
-            tooltip: allSelected ? '清空选择' : '全选',
+            tooltip: allSelected
+                ? config.text.clearSelectionTooltip
+                : config.text.selectAllTooltip,
             onTap: allSelected ? onClearSelection : onSelectAll,
           ),
         if (onAddPressed != null) ...[
           const SizedBox(width: 8),
           _ToolbarIconButton(
             icon: Icons.add_photo_alternate_outlined,
-            tooltip: '导入素材',
+            tooltip: config.text.importButtonLabel,
             onTap: onAddPressed,
             color: theme.primary(context),
           ),

@@ -27,12 +27,42 @@ class MediaFileTypeService {
   }
 
   MediaImportValidationResult validateFiles(
-    List<MediaAssetFileCandidate> files,
+    List<LocalMediaImportSource> files,
   ) {
-    final accepted = <String>[];
+    final accepted = <ValidatedMediaAssetImport>[];
     final rejected = <RejectedMediaFile>[];
 
     for (final file in files) {
+      if (!file.exists) {
+        rejected.add(
+          RejectedMediaFile(
+            path: file.path,
+            reason: RejectedMediaFileReason.missing,
+          ),
+        );
+        continue;
+      }
+
+      if (!file.isReadable) {
+        rejected.add(
+          RejectedMediaFile(
+            path: file.path,
+            reason: RejectedMediaFileReason.unreadable,
+          ),
+        );
+        continue;
+      }
+
+      if (file.fileSize == 0) {
+        rejected.add(
+          RejectedMediaFile(
+            path: file.path,
+            reason: RejectedMediaFileReason.emptyFile,
+          ),
+        );
+        continue;
+      }
+
       final type = typeForPath(file.path);
       if (type == null) {
         rejected.add(
@@ -72,12 +102,24 @@ class MediaFileTypeService {
         }
       }
 
-      accepted.add(file.path);
+      accepted.add(
+        ValidatedMediaAssetImport(
+          path: file.path,
+          name: fileNameOf(file.path),
+          type: type,
+          fileSize: file.fileSize ?? 0,
+          contentHash: file.contentHash,
+        ),
+      );
     }
 
     return MediaImportValidationResult(
-      acceptedPaths: accepted,
+      acceptedFiles: accepted,
       rejectedFiles: rejected,
     );
+  }
+
+  String fileNameOf(String path) {
+    return path.split(RegExp(r'[/\\]')).last;
   }
 }

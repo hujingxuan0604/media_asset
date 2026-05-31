@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:media_asset/media_asset.dart';
 
@@ -39,36 +41,25 @@ class _MediaAssetDemoAppState extends State<MediaAssetDemoApp> {
                   ..addAll(ids);
               });
             },
-            onImportFiles: (paths) async {
+            onImportFiles: (candidates) async {
               final now = DateTime.now();
               setState(() {
                 _assets.addAll(
-                  paths.map((path) {
-                    final name = path.split(RegExp(r'[/\\]')).last;
-                    final lowerPath = path.toLowerCase();
-                    final type =
-                        const [
-                          '.mp4',
-                          '.mov',
-                          '.m4v',
-                          '.webm',
-                          '.mkv',
-                          '.avi',
-                        ].any(lowerPath.endsWith)
-                        ? MediaAssetType.video
-                        : MediaAssetType.image;
+                  candidates.map((candidate) {
                     return MediaAsset(
-                      id: '${now.microsecondsSinceEpoch}-$path',
-                      name: name,
-                      filePath: path,
-                      type: type,
-                      fileSize: 0,
+                      id: '${now.microsecondsSinceEpoch}-${candidate.path}',
+                      name: candidate.name,
+                      filePath: candidate.path,
+                      type: candidate.type,
+                      fileSize: candidate.fileSize,
+                      contentHash: candidate.contentHash,
                       createdAt: now,
                     );
                   }),
                 );
               });
             },
+            onResolveImportSources: _resolveImportSources,
             onDeleteAsset: (asset) {
               setState(() {
                 _assets.removeWhere((item) => item.id == asset.id);
@@ -86,5 +77,37 @@ class _MediaAssetDemoAppState extends State<MediaAssetDemoApp> {
         ),
       ),
     );
+  }
+
+  Future<List<LocalMediaImportSource>> _resolveImportSources(
+    List<LocalMediaImportSource> sources,
+  ) async {
+    final resolved = <LocalMediaImportSource>[];
+    for (final source in sources) {
+      if (source.contentHash != null || !source.exists || !source.isReadable) {
+        resolved.add(source);
+        continue;
+      }
+
+      try {
+        final file = File(source.path);
+        final stat = await file.stat();
+        if (stat.type != FileSystemEntityType.file) {
+          resolved.add(source);
+          continue;
+        }
+
+        resolved.add(
+          source.copyWith(
+            fileSize: source.fileSize ?? stat.size,
+            contentHash:
+                '${file.absolute.path}|${stat.size}|${stat.modified.microsecondsSinceEpoch}',
+          ),
+        );
+      } catch (_) {
+        resolved.add(source);
+      }
+    }
+    return resolved;
   }
 }
