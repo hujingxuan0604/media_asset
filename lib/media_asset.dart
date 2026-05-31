@@ -14,4 +14,10 @@ export 'src/views/media_asset_context_menu.dart'
 export 'src/views/media_asset_grid.dart' show MediaAssetDragFeedbackBuilder;
 export 'src/views/media_asset_preview_dialog.dart';
 export 'src/views/media_asset_tile.dart'
-    show MediaAssetMenuBuilder, MediaAssetTileBuilder, MediaAssetTileState;
+    show
+        MediaAssetMenuBuilder,
+        MediaAssetSelectionBadgeBuilder,
+        MediaAssetTileBuilder,
+        MediaAssetTileState;
+export 'src/views/media_asset_toolbar.dart'
+    show MediaAssetToolbarBuilder, MediaAssetToolbarState;

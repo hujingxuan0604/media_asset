@@ -24,6 +24,20 @@ typedef MediaAssetMenuBuilder =
       MediaAssetMenuController controller,
     );
 
+typedef MediaAssetSelectionBadgeBuilder =
+    Widget Function(
+      BuildContext context,
+      MediaAsset asset,
+      MediaAssetTileState state,
+    );
+
+typedef MediaAssetTileDragFeedbackBuilder =
+    Widget Function(
+      BuildContext context,
+      MediaAsset asset,
+      MediaAssetTileState state,
+    );
+
 class MediaAssetTileState {
   final bool isBatchSelected;
   final int duplicateHighlightToken;
@@ -47,6 +61,9 @@ class MediaAssetTile extends StatefulWidget {
   final VoidCallback? onDelete;
   final VoidCallback? onRevealInFolder;
   final MediaAssetMenuBuilder? menuBuilder;
+  final MediaAssetSelectionBadgeBuilder? selectionBadgeBuilder;
+  final MediaAssetTileDragFeedbackBuilder? dragFeedbackBuilder;
+  final bool enableAssetDragging;
 
   const MediaAssetTile({
     super.key,
@@ -58,6 +75,9 @@ class MediaAssetTile extends StatefulWidget {
     this.onDelete,
     this.onRevealInFolder,
     this.menuBuilder,
+    this.selectionBadgeBuilder,
+    this.dragFeedbackBuilder,
+    this.enableAssetDragging = false,
   });
 
   @override
@@ -120,48 +140,38 @@ class _MediaAssetTileState extends State<MediaAssetTile>
         )!;
         final borderWidth = 1.0 + pulse * 2.2;
         final layout = widget.state.config.layout;
+        final tileBody = _buildTileBody(
+          context: context,
+          layout: layout,
+          borderColor: borderColor,
+          borderWidth: borderWidth,
+          pulse: pulse,
+          theme: theme,
+          canShowMenu: canShowMenu,
+        );
 
         return SizedBox(
           width: widget.state.tileExtent ?? layout.tileWidth,
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: widget.onTap,
-                  onDoubleTap: widget.onDoubleTap,
-                  onSecondaryTapDown: canShowMenu
-                      ? (details) =>
-                            _showContextMenu(context, details.globalPosition)
-                      : null,
-                  borderRadius: theme.borderRadius,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 140),
-                    padding: layout.tilePadding,
-                    decoration: BoxDecoration(
-                      color: theme.elevatedSurface(context),
-                      borderRadius: theme.borderRadius,
-                      border: Border.all(
-                        color: borderColor,
-                        width: borderWidth,
-                      ),
-                      boxShadow: pulse > 0
-                          ? [
-                              BoxShadow(
-                                color: theme
-                                    .primary(context)
-                                    .withValues(alpha: 0.26 * pulse),
-                                blurRadius: 14 * pulse,
-                                spreadRadius: 1.6 * pulse,
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: _buildGridContent(layout),
-                  ),
-                ),
-              ),
+              widget.enableAssetDragging
+                  ? Draggable<MediaAsset>(
+                      data: widget.asset,
+                      feedback:
+                          widget.dragFeedbackBuilder?.call(
+                            context,
+                            widget.asset,
+                            widget.state,
+                          ) ??
+                          _MediaAssetDragFeedback(
+                            asset: widget.asset,
+                            state: widget.state,
+                          ),
+                      childWhenDragging: tileBody,
+                      child: tileBody,
+                    )
+                  : tileBody,
               if (_showDeleteButton)
                 Positioned(
                   top: -5,
@@ -178,10 +188,71 @@ class _MediaAssetTileState extends State<MediaAssetTile>
                     ),
                   ),
                 ),
+              if (widget.onToggleSelection != null)
+                Positioned(
+                  top: layout.tilePadding.top + 5,
+                  right: layout.tilePadding.right + 5,
+                  child: _SelectionBadgeHitTarget(
+                    selected: widget.state.isBatchSelected,
+                    onTap: widget.onToggleSelection,
+                    child:
+                        widget.selectionBadgeBuilder?.call(
+                          context,
+                          widget.asset,
+                          widget.state,
+                        ) ??
+                        _DefaultSelectionBadge(
+                          selected: widget.state.isBatchSelected,
+                        ),
+                  ),
+                ),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildTileBody({
+    required BuildContext context,
+    required MediaAssetLayoutConfig layout,
+    required Color borderColor,
+    required double borderWidth,
+    required double pulse,
+    required MediaAssetThemeData theme,
+    required bool canShowMenu,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: widget.onTap,
+        onDoubleTap: widget.onDoubleTap,
+        onSecondaryTapDown: canShowMenu
+            ? (details) => _showContextMenu(context, details.globalPosition)
+            : null,
+        borderRadius: theme.borderRadius,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          padding: layout.tilePadding,
+          decoration: BoxDecoration(
+            color: theme.elevatedSurface(context),
+            borderRadius: theme.borderRadius,
+            border: Border.all(color: borderColor, width: borderWidth),
+            boxShadow: pulse > 0
+                ? [
+                    BoxShadow(
+                      color: theme
+                          .primary(context)
+                          .withValues(alpha: 0.26 * pulse),
+                      blurRadius: 14 * pulse,
+                      spreadRadius: 1.6 * pulse,
+                    ),
+                  ]
+                : null,
+          ),
+          child: _buildGridContent(layout),
+        ),
+      ),
     );
   }
 
@@ -192,11 +263,7 @@ class _MediaAssetTileState extends State<MediaAssetTile>
       child: MediaAssetTilePreview(
         asset: widget.asset,
         height: layout.tilePreviewHeight,
-        selected: widget.state.isBatchSelected,
         showMetadata: _isPreviewHovering,
-        onToggleSelection: widget.state.config.interaction.enableMultiSelection
-            ? widget.onToggleSelection
-            : null,
       ),
     );
   }
@@ -350,6 +417,99 @@ class _FloatingActionBadge extends StatelessWidget {
               boxShadow: theme.shadow,
             ),
             child: Icon(icon, size: iconSize, color: theme.mutedText(context)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectionBadgeHitTarget extends StatelessWidget {
+  final bool selected;
+  final VoidCallback? onTap;
+  final Widget child;
+
+  const _SelectionBadgeHitTarget({
+    required this.selected,
+    required this.onTap,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: selected ? '取消选择' : '选择',
+      child: MouseRegion(
+        opaque: true,
+        cursor: onTap == null ? MouseCursor.defer : SystemMouseCursors.click,
+        child: Listener(
+          behavior: HitTestBehavior.opaque,
+          onPointerDown: onTap == null ? null : (_) => onTap!(),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+            child: Center(child: child),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DefaultSelectionBadge extends StatelessWidget {
+  final bool selected;
+
+  const _DefaultSelectionBadge({required this.selected});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = MediaAssetTheme.of(context);
+    return Container(
+      width: 22,
+      height: 22,
+      decoration: BoxDecoration(
+        color: selected
+            ? theme.primary(context)
+            : Colors.black.withValues(alpha: 0.45),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(
+        selected ? Icons.check_rounded : Icons.add_rounded,
+        size: 14,
+        color: Colors.white,
+      ),
+    );
+  }
+}
+
+class _MediaAssetDragFeedback extends StatelessWidget {
+  final MediaAsset asset;
+  final MediaAssetTileState state;
+
+  const _MediaAssetDragFeedback({required this.asset, required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      type: MaterialType.transparency,
+      child: Transform.scale(
+        scale: 0.98,
+        child: DecoratedBox(
+          decoration: const BoxDecoration(
+            boxShadow: [
+              BoxShadow(
+                color: Color(0x33000000),
+                blurRadius: 18,
+                offset: Offset(0, 8),
+              ),
+            ],
+          ),
+          child: MediaAssetTile(
+            asset: asset,
+            state: state,
+            onTap: () {},
+            onDoubleTap: () {},
           ),
         ),
       ),

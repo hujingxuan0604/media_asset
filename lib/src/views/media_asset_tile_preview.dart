@@ -9,17 +9,13 @@ import '../theme/media_asset_theme.dart';
 class MediaAssetTilePreview extends StatelessWidget {
   final MediaAsset asset;
   final double height;
-  final bool selected;
   final bool showMetadata;
-  final VoidCallback? onToggleSelection;
 
   const MediaAssetTilePreview({
     super.key,
     required this.asset,
     required this.height,
-    required this.selected,
     required this.showMetadata,
-    required this.onToggleSelection,
   });
 
   @override
@@ -45,15 +41,6 @@ class MediaAssetTilePreview extends StatelessWidget {
                   left: 6,
                   top: 6,
                   child: _TypeBadge(label: asset.type.label),
-                ),
-              if (onToggleSelection != null)
-                Positioned(
-                  top: 5,
-                  right: 5,
-                  child: _SelectionBadge(
-                    selected: selected,
-                    onTap: onToggleSelection,
-                  ),
                 ),
               if (showMetadata)
                 Positioned(
@@ -265,39 +252,6 @@ class _VideoThumbState extends State<_VideoThumb> {
           ),
         );
       },
-    );
-  }
-}
-
-class _SelectionBadge extends StatelessWidget {
-  final bool selected;
-  final VoidCallback? onTap;
-
-  const _SelectionBadge({required this.selected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: selected ? '取消选择' : '选择',
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Container(
-          width: 22,
-          height: 22,
-          decoration: BoxDecoration(
-            color: selected
-                ? MediaAssetTheme.of(context).primary(context)
-                : Colors.black.withValues(alpha: 0.45),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            selected ? Icons.check_rounded : Icons.add_rounded,
-            size: 14,
-            color: Colors.white,
-          ),
-        ),
-      ),
     );
   }
 }

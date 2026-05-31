@@ -4,12 +4,7 @@ import '../config/media_asset_config.dart';
 import '../models/media_asset_models.dart';
 import 'media_asset_tile.dart';
 
-typedef MediaAssetDragFeedbackBuilder =
-    Widget Function(
-      BuildContext context,
-      MediaAsset asset,
-      MediaAssetTileState state,
-    );
+typedef MediaAssetDragFeedbackBuilder = MediaAssetTileDragFeedbackBuilder;
 
 class MediaAssetGrid extends StatelessWidget {
   final List<MediaAsset> assets;
@@ -23,6 +18,7 @@ class MediaAssetGrid extends StatelessWidget {
   final ValueChanged<MediaAsset>? onRevealAssetInFolder;
   final MediaAssetTileBuilder? tileBuilder;
   final MediaAssetMenuBuilder? menuBuilder;
+  final MediaAssetSelectionBadgeBuilder? selectionBadgeBuilder;
   final MediaAssetDragFeedbackBuilder? dragFeedbackBuilder;
 
   const MediaAssetGrid({
@@ -38,6 +34,7 @@ class MediaAssetGrid extends StatelessWidget {
     this.onRevealAssetInFolder,
     this.tileBuilder,
     this.menuBuilder,
+    this.selectionBadgeBuilder,
     this.dragFeedbackBuilder,
   });
 
@@ -94,78 +91,46 @@ class MediaAssetGrid extends StatelessWidget {
       config: config,
     );
     final customTile = tileBuilder?.call(context, asset, state);
-    final tile =
-        customTile ??
-        MediaAssetTile(
-          asset: asset,
-          state: state,
-          onTap: () => onTapAsset(asset),
-          onDoubleTap: !interaction.isActionEnabled(MediaAssetAction.preview)
-              ? null
-              : () => onPreviewAsset(asset),
-          onToggleSelection:
-              onToggleSelection == null ||
-                  !interaction.isActionEnabled(MediaAssetAction.select)
-              ? null
-              : () => onToggleSelection!(asset),
-          onDelete:
-              onDeleteAsset == null ||
-                  !interaction.isActionEnabled(MediaAssetAction.delete)
-              ? null
-              : () => onDeleteAsset!(asset),
-          onRevealInFolder:
-              onRevealAssetInFolder == null ||
-                  !interaction.isActionEnabled(MediaAssetAction.revealInFolder)
-              ? null
-              : () => onRevealAssetInFolder!(asset),
-          menuBuilder: menuBuilder,
-        );
+    if (customTile != null) {
+      if (!config.interaction.enableAssetDragging) {
+        return customTile;
+      }
 
-    if (!config.interaction.enableAssetDragging) {
-      return tile;
+      return Draggable<MediaAsset>(
+        data: asset,
+        feedback:
+            dragFeedbackBuilder?.call(context, asset, state) ?? customTile,
+        childWhenDragging: customTile,
+        child: customTile,
+      );
     }
 
-    return Draggable<MediaAsset>(
-      data: asset,
-      feedback:
-          dragFeedbackBuilder?.call(context, asset, state) ??
-          _MediaAssetDragFeedback(asset: asset, state: state),
-      childWhenDragging: tile,
-      child: tile,
-    );
-  }
-}
-
-class _MediaAssetDragFeedback extends StatelessWidget {
-  final MediaAsset asset;
-  final MediaAssetTileState state;
-
-  const _MediaAssetDragFeedback({required this.asset, required this.state});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      type: MaterialType.transparency,
-      child: Transform.scale(
-        scale: 0.98,
-        child: DecoratedBox(
-          decoration: const BoxDecoration(
-            boxShadow: [
-              BoxShadow(
-                color: Color(0x33000000),
-                blurRadius: 18,
-                offset: Offset(0, 8),
-              ),
-            ],
-          ),
-          child: MediaAssetTile(
-            asset: asset,
-            state: state,
-            onTap: () {},
-            onDoubleTap: () {},
-          ),
-        ),
-      ),
+    return MediaAssetTile(
+      asset: asset,
+      state: state,
+      onTap: () => onTapAsset(asset),
+      onDoubleTap: !interaction.isActionEnabled(MediaAssetAction.preview)
+          ? null
+          : () => onPreviewAsset(asset),
+      onToggleSelection:
+          onToggleSelection == null ||
+              !interaction.isActionEnabled(MediaAssetAction.select)
+          ? null
+          : () => onToggleSelection!(asset),
+      onDelete:
+          onDeleteAsset == null ||
+              !interaction.isActionEnabled(MediaAssetAction.delete)
+          ? null
+          : () => onDeleteAsset!(asset),
+      onRevealInFolder:
+          onRevealAssetInFolder == null ||
+              !interaction.isActionEnabled(MediaAssetAction.revealInFolder)
+          ? null
+          : () => onRevealAssetInFolder!(asset),
+      menuBuilder: menuBuilder,
+      selectionBadgeBuilder: selectionBadgeBuilder,
+      dragFeedbackBuilder: dragFeedbackBuilder,
+      enableAssetDragging: config.interaction.enableAssetDragging,
     );
   }
 }

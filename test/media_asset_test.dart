@@ -843,6 +843,153 @@ void main() {
     expect(deletedAsset?.id, 'asset');
   });
 
+  testWidgets(
+    'selection badge is isolated from drag preview and hover overlay',
+    (tester) async {
+      MediaAsset? receivedAsset;
+      final emittedSelections = <Set<String>>[];
+      final previewActions = <MediaAssetAction>[];
+      final asset = MediaAsset(
+        id: 'asset',
+        name: 'asset.png',
+        filePath: '/tmp/asset.png',
+        type: MediaAssetType.image,
+        fileSize: 0,
+        createdAt: DateTime(2026, 1, 1),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Row(
+              children: [
+                SizedBox(
+                  width: 240,
+                  child: MediaAssetLibrary(
+                    config: const MediaAssetLibraryConfig(
+                      layout: MediaAssetLayoutConfig(showToolbar: false),
+                    ),
+                    assets: [asset],
+                    onSelectionChanged: (ids) {
+                      emittedSelections.add(ids);
+                    },
+                    onAssetAction: (action, asset) {
+                      if (action == MediaAssetAction.preview) {
+                        previewActions.add(action);
+                      }
+                    },
+                  ),
+                ),
+                DragTarget<MediaAsset>(
+                  onAcceptWithDetails: (details) {
+                    receivedAsset = details.data;
+                  },
+                  builder: (context, candidateData, rejectedData) {
+                    return const SizedBox(
+                      key: ValueKey('module-target'),
+                      width: 240,
+                      height: 160,
+                      child: Text('其他模块'),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer();
+      await mouse.moveTo(tester.getCenter(find.byIcon(Icons.add_rounded)));
+      await tester.pump();
+
+      expect(find.text('asset.png'), findsNothing);
+      expect(find.text('0 B'), findsNothing);
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byIcon(Icons.add_rounded)),
+      );
+      await tester.pump();
+
+      expect(emittedSelections, [
+        {'asset'},
+      ]);
+      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+
+      await gesture.moveTo(
+        tester.getCenter(find.byKey(const ValueKey('module-target'))),
+      );
+      await tester.pump();
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(receivedAsset, isNull);
+      expect(previewActions, isEmpty);
+
+      await tester.tap(find.byIcon(Icons.check_rounded));
+      await tester.pump();
+
+      expect(emittedSelections.last, isEmpty);
+      expect(find.byIcon(Icons.add_rounded), findsOneWidget);
+    },
+  );
+
+  testWidgets('supports custom toolbar and selection badge builders', (
+    tester,
+  ) async {
+    final emittedSelections = <Set<String>>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MediaAssetLibrary(
+            assets: [
+              MediaAsset(
+                id: 'asset',
+                name: 'asset.png',
+                filePath: '/tmp/asset.png',
+                type: MediaAssetType.image,
+                fileSize: 0,
+                createdAt: DateTime(2026, 1, 1),
+              ),
+            ],
+            toolbarBuilder: (context, state) {
+              return Text('自定义工具栏 ${state.selectedCount}/${state.assetCount}');
+            },
+            selectionBadgeBuilder: (context, asset, state) {
+              return SizedBox(
+                key: const ValueKey('custom-selection-badge'),
+                width: 24,
+                height: 24,
+                child: Text(state.isBatchSelected ? 'Y' : 'N'),
+              );
+            },
+            onSelectionChanged: (ids) {
+              emittedSelections.add(ids);
+            },
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('自定义工具栏 0/1'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('custom-selection-badge')),
+      findsOneWidget,
+    );
+    expect(find.text('N'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('custom-selection-badge')));
+    await tester.pump();
+
+    expect(emittedSelections, [
+      {'asset'},
+    ]);
+    expect(find.text('自定义工具栏 1/1'), findsOneWidget);
+    expect(find.text('Y'), findsOneWidget);
+  });
+
   testWidgets('drags imported assets to a host drag target', (tester) async {
     MediaAsset? receivedAsset;
     final asset = MediaAsset(

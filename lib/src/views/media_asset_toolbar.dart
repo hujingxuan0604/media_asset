@@ -4,10 +4,13 @@ import '../config/media_asset_config.dart';
 import '../models/media_asset_models.dart';
 import '../theme/media_asset_theme.dart';
 
-class MediaAssetToolbar extends StatelessWidget {
+typedef MediaAssetToolbarBuilder =
+    Widget Function(BuildContext context, MediaAssetToolbarState state);
+
+class MediaAssetToolbarState {
   final String title;
-  final int assetCount;
-  final int selectedCount;
+  final List<MediaAsset> assets;
+  final List<MediaAsset> selectedAssets;
   final bool allSelected;
   final MediaAssetLibraryConfig config;
   final VoidCallback? onAddPressed;
@@ -15,11 +18,10 @@ class MediaAssetToolbar extends StatelessWidget {
   final VoidCallback? onClearSelection;
   final VoidCallback? onDeleteSelected;
 
-  const MediaAssetToolbar({
-    super.key,
+  const MediaAssetToolbarState({
     required this.title,
-    required this.assetCount,
-    required this.selectedCount,
+    required this.assets,
+    required this.selectedAssets,
     required this.allSelected,
     required this.config,
     this.onAddPressed,
@@ -28,9 +30,22 @@ class MediaAssetToolbar extends StatelessWidget {
     this.onDeleteSelected,
   });
 
+  int get assetCount => assets.length;
+
+  int get selectedCount => selectedAssets.length;
+}
+
+class MediaAssetToolbar extends StatelessWidget {
+  final MediaAssetToolbarState state;
+
+  const MediaAssetToolbar({super.key, required this.state});
+
   @override
   Widget build(BuildContext context) {
     final theme = MediaAssetTheme.of(context);
+    final config = state.config;
+    final assetCount = state.assetCount;
+    final selectedCount = state.selectedCount;
     final canSelect =
         config.interaction.enableMultiSelection &&
         config.interaction.isActionEnabled(MediaAssetAction.select) &&
@@ -43,7 +58,7 @@ class MediaAssetToolbar extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                title,
+                state.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -66,27 +81,29 @@ class MediaAssetToolbar extends StatelessWidget {
           _ToolbarIconButton(
             icon: Icons.delete_outline_rounded,
             tooltip: config.text.deleteSelectedTooltip,
-            onTap: onDeleteSelected,
+            onTap: state.onDeleteSelected,
             color: theme.danger(context),
           ),
           const SizedBox(width: 8),
         ],
         if (canSelect)
           _ToolbarIconButton(
-            icon: allSelected
+            icon: state.allSelected
                 ? Icons.check_box_outlined
                 : Icons.check_box_outline_blank_outlined,
-            tooltip: allSelected
+            tooltip: state.allSelected
                 ? config.text.clearSelectionTooltip
                 : config.text.selectAllTooltip,
-            onTap: allSelected ? onClearSelection : onSelectAll,
+            onTap: state.allSelected
+                ? state.onClearSelection
+                : state.onSelectAll,
           ),
-        if (onAddPressed != null) ...[
+        if (state.onAddPressed != null) ...[
           const SizedBox(width: 8),
           _ToolbarIconButton(
             icon: Icons.add_photo_alternate_outlined,
             tooltip: config.text.importButtonLabel,
-            onTap: onAddPressed,
+            onTap: state.onAddPressed,
             color: theme.primary(context),
           ),
         ],

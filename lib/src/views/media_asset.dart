@@ -47,6 +47,8 @@ class MediaAssetLibrary extends StatefulWidget {
   final WidgetBuilder? emptyBuilder;
   final MediaAssetTileBuilder? tileBuilder;
   final MediaAssetMenuBuilder? menuBuilder;
+  final MediaAssetToolbarBuilder? toolbarBuilder;
+  final MediaAssetSelectionBadgeBuilder? selectionBadgeBuilder;
   final MediaAssetDragFeedbackBuilder? dragFeedbackBuilder;
   final MediaAssetPreviewDialogBuilder? previewDialogBuilder;
 
@@ -72,6 +74,8 @@ class MediaAssetLibrary extends StatefulWidget {
     this.emptyBuilder,
     this.tileBuilder,
     this.menuBuilder,
+    this.toolbarBuilder,
+    this.selectionBadgeBuilder,
     this.dragFeedbackBuilder,
     this.previewDialogBuilder,
   });
@@ -148,7 +152,6 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
             onAssetAction: widget.onAssetAction,
           );
 
-          final selectedAssets = _selectedAssetsFrom(orderedAssets);
           final onAddPressed =
               widget.onAddPressed ??
               (widget.onImportFiles == null
@@ -156,63 +159,72 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
                   : () => unawaited(
                       _handleAddPressed(context, scopedConfig, controller),
                     ));
-          final allSelected =
-              orderedAssets.isNotEmpty &&
-              _selectionController.selectedAssetIds.length ==
-                  orderedAssets.length;
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (scopedConfig.layout.showToolbar) ...[
-                MediaAssetToolbar(
-                  title: widget.title,
-                  assetCount: orderedAssets.length,
-                  selectedCount: selectedAssets.length,
-                  allSelected: allSelected,
-                  config: scopedConfig,
-                  onAddPressed: onAddPressed,
-                  onSelectAll: () => _emitSelection(
-                    _selectionController.selectAll(
-                      orderedAssets.map((asset) => asset.id),
+          return AnimatedBuilder(
+            animation: _selectionController,
+            builder: (context, child) {
+              final selectedAssets = _selectedAssetsFrom(orderedAssets);
+              final allSelected =
+                  orderedAssets.isNotEmpty &&
+                  _selectionController.selectedAssetIds.length ==
+                      orderedAssets.length;
+              final toolbarState = MediaAssetToolbarState(
+                title: widget.title,
+                assets: orderedAssets,
+                selectedAssets: selectedAssets,
+                allSelected: allSelected,
+                config: scopedConfig,
+                onAddPressed: onAddPressed,
+                onSelectAll: () => _emitSelection(
+                  _selectionController.selectAll(
+                    orderedAssets.map((asset) => asset.id),
+                  ),
+                ),
+                onClearSelection: () =>
+                    _emitSelection(_selectionController.clear()),
+                onDeleteSelected:
+                    widget.onDeleteSelectedAssets == null ||
+                        !scopedConfig.interaction.isActionEnabled(
+                          MediaAssetAction.delete,
+                        )
+                    ? null
+                    : () => widget.onDeleteSelectedAssets!(selectedAssets),
+              );
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (scopedConfig.layout.showToolbar) ...[
+                    widget.toolbarBuilder?.call(context, toolbarState) ??
+                        MediaAssetToolbar(state: toolbarState),
+                    const SizedBox(height: 12),
+                  ],
+                  _buildLibraryBodyContainer(
+                    scopedConfig,
+                    MediaAssetDropZone(
+                      config: scopedConfig,
+                      enabled:
+                          scopedConfig.interaction.enableDragDrop &&
+                          widget.onImportFiles != null,
+                      hasAssets: orderedAssets.isNotEmpty,
+                      onAddPressed: onAddPressed,
+                      onFilesDropped: (files) => _handleDroppedFiles(
+                        context,
+                        scopedConfig,
+                        controller,
+                        files,
+                      ),
+                      child: _buildBody(
+                        context,
+                        scopedConfig,
+                        controller,
+                        orderedAssets,
+                      ),
                     ),
                   ),
-                  onClearSelection: () =>
-                      _emitSelection(_selectionController.clear()),
-                  onDeleteSelected:
-                      widget.onDeleteSelectedAssets == null ||
-                          !scopedConfig.interaction.isActionEnabled(
-                            MediaAssetAction.delete,
-                          )
-                      ? null
-                      : () => widget.onDeleteSelectedAssets!(selectedAssets),
-                ),
-                const SizedBox(height: 12),
-              ],
-              _buildLibraryBodyContainer(
-                scopedConfig,
-                MediaAssetDropZone(
-                  config: scopedConfig,
-                  enabled:
-                      scopedConfig.interaction.enableDragDrop &&
-                      widget.onImportFiles != null,
-                  hasAssets: orderedAssets.isNotEmpty,
-                  onAddPressed: onAddPressed,
-                  onFilesDropped: (files) => _handleDroppedFiles(
-                    context,
-                    scopedConfig,
-                    controller,
-                    files,
-                  ),
-                  child: _buildBody(
-                    context,
-                    scopedConfig,
-                    controller,
-                    orderedAssets,
-                  ),
-                ),
-              ),
-            ],
+                ],
+              );
+            },
           );
         },
       ),
@@ -313,6 +325,7 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
           config: config,
           tileBuilder: widget.tileBuilder,
           menuBuilder: widget.menuBuilder,
+          selectionBadgeBuilder: widget.selectionBadgeBuilder,
           dragFeedbackBuilder: widget.dragFeedbackBuilder,
           onTapAsset: (_) {},
           onPreviewAsset: (asset) {
