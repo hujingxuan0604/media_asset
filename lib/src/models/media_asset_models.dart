@@ -1,5 +1,9 @@
+/// 素材文件的媒体类型。
 enum MediaAssetType {
+  /// 图片素材，例如 jpg、png、webp 等文件。
   image,
+
+  /// 视频素材，例如 mp4、mov、webm 等文件。
   video;
 
   String get label {
@@ -12,14 +16,39 @@ enum MediaAssetType {
   }
 }
 
-enum MediaAssetAction { preview, select, delete, revealInFolder }
+/// 用户可以对单个素材执行的操作。
+enum MediaAssetAction {
+  /// 打开素材预览。
+  preview,
 
+  /// 切换素材的批量选择状态。
+  select,
+
+  /// 删除素材。
+  delete,
+
+  /// 在系统文件管理器中定位素材文件。
+  revealInFolder,
+}
+
+/// 本地文件导入时被拒绝的原因。
 enum RejectedMediaFileReason {
+  /// 文件扩展名不在允许的图片或视频类型中。
   unsupportedType,
+
+  /// 图片文件超过了配置的最大图片大小。
   imageTooLarge,
+
+  /// 视频文件超过了配置的最大视频大小。
   videoTooLarge,
+
+  /// 文件路径不存在。
   missing,
+
+  /// 文件存在但当前进程无法读取。
   unreadable,
+
+  /// 文件大小为 0。
   emptyFile,
 }
 

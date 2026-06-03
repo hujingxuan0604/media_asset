@@ -13,10 +13,13 @@ class MediaAssetToolbarState {
   final List<MediaAsset> selectedAssets;
   final bool allSelected;
   final MediaAssetLibraryConfig config;
+  final bool isCollapsed;
+  final bool isCollapsible;
   final VoidCallback? onAddPressed;
   final VoidCallback? onSelectAll;
   final VoidCallback? onClearSelection;
   final VoidCallback? onDeleteSelected;
+  final VoidCallback? onToggleCollapsed;
 
   const MediaAssetToolbarState({
     required this.title,
@@ -24,10 +27,13 @@ class MediaAssetToolbarState {
     required this.selectedAssets,
     required this.allSelected,
     required this.config,
+    this.isCollapsed = false,
+    this.isCollapsible = false,
     this.onAddPressed,
     this.onSelectAll,
     this.onClearSelection,
     this.onDeleteSelected,
+    this.onToggleCollapsed,
   });
 
   int get assetCount => assets.length;
@@ -51,63 +57,69 @@ class MediaAssetToolbar extends StatelessWidget {
         config.interaction.isActionEnabled(MediaAssetAction.select) &&
         assetCount > 0;
 
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
+    return SizedBox(
+      height: 32,
+      child: Row(
+        children: [
+          Expanded(
+            child: Tooltip(
+              message: selectedCount > 0
+                  ? '已选择 $selectedCount / $assetCount'
+                  : '共 $assetCount 个素材',
+              child: Text(
                 state.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 14,
                   fontWeight: FontWeight.w700,
                   color: theme.text(context),
                 ),
               ),
-              const SizedBox(height: 3),
-              Text(
-                selectedCount > 0
-                    ? '已选择 $selectedCount / $assetCount'
-                    : '共 $assetCount 个素材',
-                style: TextStyle(fontSize: 12, color: theme.mutedText(context)),
-              ),
-            ],
+            ),
           ),
-        ),
-        if (selectedCount > 0) ...[
-          _ToolbarIconButton(
-            icon: Icons.delete_outline_rounded,
-            tooltip: config.text.deleteSelectedTooltip,
-            onTap: state.onDeleteSelected,
-            color: theme.danger(context),
-          ),
-          const SizedBox(width: 8),
+          if (selectedCount > 0) ...[
+            _ToolbarIconButton(
+              icon: Icons.delete_outline_rounded,
+              tooltip: config.text.deleteSelectedTooltip,
+              onTap: state.onDeleteSelected,
+              color: theme.danger(context),
+            ),
+            const SizedBox(width: 8),
+          ],
+          if (canSelect)
+            _ToolbarIconButton(
+              icon: state.allSelected
+                  ? Icons.check_box_outlined
+                  : Icons.check_box_outline_blank_outlined,
+              tooltip: state.allSelected
+                  ? config.text.clearSelectionTooltip
+                  : config.text.selectAllTooltip,
+              onTap: state.allSelected
+                  ? state.onClearSelection
+                  : state.onSelectAll,
+            ),
+          if (state.onAddPressed != null) ...[
+            const SizedBox(width: 8),
+            _ToolbarIconButton(
+              icon: Icons.add_rounded,
+              tooltip: config.text.importButtonLabel,
+              onTap: state.onAddPressed,
+              color: theme.primary(context),
+            ),
+          ],
+          if (state.isCollapsible) ...[
+            const SizedBox(width: 6),
+            _ToolbarIconButton(
+              icon: state.isCollapsed
+                  ? Icons.keyboard_arrow_down_rounded
+                  : Icons.keyboard_arrow_up_rounded,
+              tooltip: state.isCollapsed ? '展开模块' : '折叠模块',
+              onTap: state.onToggleCollapsed,
+            ),
+          ],
         ],
-        if (canSelect)
-          _ToolbarIconButton(
-            icon: state.allSelected
-                ? Icons.check_box_outlined
-                : Icons.check_box_outline_blank_outlined,
-            tooltip: state.allSelected
-                ? config.text.clearSelectionTooltip
-                : config.text.selectAllTooltip,
-            onTap: state.allSelected
-                ? state.onClearSelection
-                : state.onSelectAll,
-          ),
-        if (state.onAddPressed != null) ...[
-          const SizedBox(width: 8),
-          _ToolbarIconButton(
-            icon: Icons.add_photo_alternate_outlined,
-            tooltip: config.text.importButtonLabel,
-            onTap: state.onAddPressed,
-            color: theme.primary(context),
-          ),
-        ],
-      ],
+      ),
     );
   }
 }

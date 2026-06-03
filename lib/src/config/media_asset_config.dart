@@ -3,19 +3,6 @@ import 'package:flutter/widgets.dart';
 
 import '../models/media_asset_models.dart';
 
-enum MediaAssetSortMode {
-  manual,
-  createdAtDesc,
-  createdAtAsc,
-  nameAsc,
-  nameDesc,
-  fileSizeDesc,
-  fileSizeAsc,
-  typeAsc,
-}
-
-enum MediaAssetDensity { compact, comfortable, spacious }
-
 class MediaAssetLibraryConfig {
   final MediaAssetImportConfig importConfig;
   final MediaAssetInteractionConfig interaction;
@@ -71,46 +58,22 @@ class MediaAssetLayoutConfig {
   final bool showToolbar;
   final double? height;
   final bool shrinkWrap;
-  final MediaAssetDensity density;
   final Size thumbnailSize;
-  final MediaAssetSortMode sortMode;
-  final Comparator<MediaAsset>? sortComparator;
 
   const MediaAssetLayoutConfig({
     this.showToolbar = true,
     this.height,
     this.shrinkWrap = false,
-    this.density = MediaAssetDensity.comfortable,
     this.thumbnailSize = const Size(96, 78),
-    this.sortMode = MediaAssetSortMode.createdAtDesc,
-    this.sortComparator,
   });
 
   double get tileWidth => thumbnailSize.width + tilePadding.horizontal;
 
   double get tilePreviewHeight => thumbnailSize.height;
 
-  EdgeInsets get tilePadding {
-    switch (density) {
-      case MediaAssetDensity.compact:
-        return const EdgeInsets.all(6);
-      case MediaAssetDensity.comfortable:
-        return const EdgeInsets.all(8);
-      case MediaAssetDensity.spacious:
-        return const EdgeInsets.all(10);
-    }
-  }
+  EdgeInsets get tilePadding => const EdgeInsets.all(8);
 
-  double get itemSpacing {
-    switch (density) {
-      case MediaAssetDensity.compact:
-        return 8;
-      case MediaAssetDensity.comfortable:
-        return 12;
-      case MediaAssetDensity.spacious:
-        return 16;
-    }
-  }
+  double get itemSpacing => 12;
 }
 
 class MediaAssetPreviewConfig {

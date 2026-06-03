@@ -32,6 +32,11 @@ class MediaAssetLibrary extends StatefulWidget {
   final MediaAssetLibraryConfig? config;
   final MediaAssetThemeData? theme;
   final String title;
+  final double? height;
+  final bool? shrinkWrap;
+  final bool? showToolbar;
+  final bool showImportButton;
+  final bool collapsible;
   final bool isLoading;
   final MediaAssetImportCallback? onImportFiles;
   final MediaAssetRejectedCallback? onRejectedFiles;
@@ -59,6 +64,11 @@ class MediaAssetLibrary extends StatefulWidget {
     this.config,
     this.theme,
     this.title = '素材库',
+    this.height,
+    this.shrinkWrap,
+    this.showToolbar,
+    this.showImportButton = true,
+    this.collapsible = false,
     this.isLoading = false,
     this.onImportFiles,
     this.onRejectedFiles,
@@ -87,10 +97,12 @@ class MediaAssetLibrary extends StatefulWidget {
 class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
   late final MediaAssetSelectionController _selectionController;
   final Map<String, int> _duplicateHighlightTokens = {};
+  late bool _isCollapsed;
 
   @override
   void initState() {
     super.initState();
+    _isCollapsed = false;
     _selectionController = MediaAssetSelectionController(
       selectedAssetIds: _validSelectedAssetIds(
         widget.selectedAssetIds,
@@ -102,6 +114,10 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
   @override
   void didUpdateWidget(MediaAssetLibrary oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!widget.collapsible && _isCollapsed) {
+      _isCollapsed = false;
+    }
+
     final shouldSyncSelection =
         oldWidget.selectedAssetIds != widget.selectedAssetIds ||
         oldWidget.assets != widget.assets;
@@ -135,7 +151,9 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
 
   @override
   Widget build(BuildContext context) {
-    final scopedConfig = widget.config ?? MediaAssetLibraryScope.of(context);
+    final scopedConfig = _resolveConfig(
+      widget.config ?? MediaAssetLibraryScope.of(context),
+    );
     final libraryTheme = widget.theme ?? MediaAssetTheme.of(context);
 
     return MediaAssetTheme(
@@ -159,6 +177,9 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
                   : () => unawaited(
                       _handleAddPressed(context, scopedConfig, controller),
                     ));
+          final visibleOnAddPressed = widget.showImportButton
+              ? onAddPressed
+              : null;
 
           return AnimatedBuilder(
             animation: _selectionController,
@@ -174,7 +195,10 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
                 selectedAssets: selectedAssets,
                 allSelected: allSelected,
                 config: scopedConfig,
-                onAddPressed: onAddPressed,
+                isCollapsed: _isCollapsed,
+                isCollapsible: widget.collapsible,
+                onAddPressed: visibleOnAddPressed,
+                onToggleCollapsed: widget.collapsible ? _toggleCollapsed : null,
                 onSelectAll: () => _emitSelection(
                   _selectionController.selectAll(
                     orderedAssets.map((asset) => asset.id),
@@ -197,31 +221,32 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
                   if (scopedConfig.layout.showToolbar) ...[
                     widget.toolbarBuilder?.call(context, toolbarState) ??
                         MediaAssetToolbar(state: toolbarState),
-                    const SizedBox(height: 12),
+                    if (!_isCollapsed) const SizedBox(height: 12),
                   ],
-                  _buildLibraryBodyContainer(
-                    scopedConfig,
-                    MediaAssetDropZone(
-                      config: scopedConfig,
-                      enabled:
-                          scopedConfig.interaction.enableDragDrop &&
-                          widget.onImportFiles != null,
-                      hasAssets: orderedAssets.isNotEmpty,
-                      onAddPressed: onAddPressed,
-                      onFilesDropped: (files) => _handleDroppedFiles(
-                        context,
-                        scopedConfig,
-                        controller,
-                        files,
-                      ),
-                      child: _buildBody(
-                        context,
-                        scopedConfig,
-                        controller,
-                        orderedAssets,
+                  if (!_isCollapsed)
+                    _buildLibraryBodyContainer(
+                      scopedConfig,
+                      MediaAssetDropZone(
+                        config: scopedConfig,
+                        enabled:
+                            scopedConfig.interaction.enableDragDrop &&
+                            widget.onImportFiles != null,
+                        hasAssets: orderedAssets.isNotEmpty,
+                        onAddPressed: visibleOnAddPressed,
+                        onFilesDropped: (files) => _handleDroppedFiles(
+                          context,
+                          scopedConfig,
+                          controller,
+                          files,
+                        ),
+                        child: _buildBody(
+                          context,
+                          scopedConfig,
+                          controller,
+                          orderedAssets,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               );
             },
@@ -247,41 +272,35 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
     return Expanded(child: child);
   }
 
-  List<MediaAsset> get _orderedAssets {
-    final scopedConfig = widget.config ?? MediaAssetLibraryScope.of(context);
-    final entries = widget.assets.asMap().entries.toList();
-    entries.sort((a, b) {
-      final comparison =
-          scopedConfig.layout.sortComparator?.call(a.value, b.value) ??
-          _compareAssets(a.value, b.value, scopedConfig.layout.sortMode);
-      if (comparison != 0) {
-        return comparison;
-      }
-      return a.key.compareTo(b.key);
-    });
-    return entries.map((entry) => entry.value).toList(growable: false);
+  MediaAssetLibraryConfig _resolveConfig(MediaAssetLibraryConfig config) {
+    if (widget.height == null &&
+        widget.shrinkWrap == null &&
+        widget.showToolbar == null) {
+      return config;
+    }
+
+    return MediaAssetLibraryConfig(
+      importConfig: config.importConfig,
+      interaction: config.interaction,
+      layout: MediaAssetLayoutConfig(
+        showToolbar: widget.showToolbar ?? config.layout.showToolbar,
+        height: widget.height ?? config.layout.height,
+        shrinkWrap: widget.shrinkWrap ?? config.layout.shrinkWrap,
+        thumbnailSize: config.layout.thumbnailSize,
+      ),
+      preview: config.preview,
+      text: config.text,
+    );
   }
 
-  int _compareAssets(MediaAsset a, MediaAsset b, MediaAssetSortMode sortMode) {
-    switch (sortMode) {
-      case MediaAssetSortMode.manual:
-        return 0;
-      case MediaAssetSortMode.createdAtDesc:
-        return b.createdAt.compareTo(a.createdAt);
-      case MediaAssetSortMode.createdAtAsc:
-        return a.createdAt.compareTo(b.createdAt);
-      case MediaAssetSortMode.nameAsc:
-        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-      case MediaAssetSortMode.nameDesc:
-        return b.name.toLowerCase().compareTo(a.name.toLowerCase());
-      case MediaAssetSortMode.fileSizeDesc:
-        return b.fileSize.compareTo(a.fileSize);
-      case MediaAssetSortMode.fileSizeAsc:
-        return a.fileSize.compareTo(b.fileSize);
-      case MediaAssetSortMode.typeAsc:
-        return a.type.index.compareTo(b.type.index);
-    }
+  void _toggleCollapsed() {
+    setState(() {
+      _isCollapsed = !_isCollapsed;
+    });
   }
+
+  List<MediaAsset> get _orderedAssets =>
+      List<MediaAsset>.of(widget.assets, growable: false);
 
   List<MediaAsset> _selectedAssetsFrom(List<MediaAsset> assets) {
     final selectedIds = _selectionController.selectedAssetIds;
@@ -305,13 +324,14 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
           MediaAssetEmptyDropZone(
             config: config,
             isActive: false,
-            onAddPressed:
-                widget.onAddPressed ??
-                (widget.onImportFiles == null
-                    ? null
-                    : () => unawaited(
-                        _handleAddPressed(context, config, controller),
-                      )),
+            onAddPressed: widget.showImportButton
+                ? widget.onAddPressed ??
+                      (widget.onImportFiles == null
+                          ? null
+                          : () => unawaited(
+                              _handleAddPressed(context, config, controller),
+                            ))
+                : null,
           );
     }
 

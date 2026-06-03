@@ -28,7 +28,11 @@ Render the library:
 
 ```dart
 MediaAssetLibrary(
+  title: '项目素材库',
   assets: assets,
+  height: 320,
+  collapsible: true,
+  showImportButton: false,
   selectedAssetIds: selectedAssetIds,
   onSelectionChanged: (ids) {
     setState(() => selectedAssetIds = ids);
@@ -57,6 +61,13 @@ MediaAssetLibrary(
   },
 )
 ```
+
+Common layout options such as `height`, `shrinkWrap`, `showToolbar`, and
+`collapsible` can be passed directly to `MediaAssetLibrary`. Set
+`showImportButton` to `false` to keep drag-and-drop import while hiding the
+built-in import button. Use
+`MediaAssetLibraryConfig` when you need deeper behavior such as file type rules,
+preview shortcuts, or custom text.
 
 Receive an imported asset elsewhere in your app:
 
@@ -97,14 +108,11 @@ Customize the duplicate summary text with
 `MediaAssetTextConfig(duplicateImportMessageTemplate: ...)`; it supports
 `{imported}` and `{duplicate}` placeholders.
 
-The default sort is `MediaAssetSortMode.createdAtDesc`. Set `sortMode` to
-`MediaAssetLibraryConfig(layout: MediaAssetLayoutConfig(sortMode: ...))`. The
-available modes are `manual`, `createdAtAsc`, `nameAsc`, `nameDesc`,
-`fileSizeAsc`, `fileSizeDesc`, and `typeAsc`. Use `sortComparator` for host
-specific ordering such as natural filename sorting or type grouping.
+The library renders assets in the order provided by the host app. Sort or group
+the list before passing it to `MediaAssetLibrary` when you need custom ordering.
 
-Grid layout is configured with desktop-level options such as `density` and
-`thumbnailSize` under `MediaAssetLayoutConfig`.
+Grid layout is configured with desktop-level options such as `thumbnailSize`
+under `MediaAssetLayoutConfig`.
 
 Video preview uses `video_player` with `fvp` registered for Windows, Linux, and
 macOS from inside the preview widget.

@@ -302,7 +302,7 @@ void main() {
 
     await tester.pump();
 
-    expect(find.text('已选择 2 / 2'), findsOneWidget);
+    expect(find.text('素材库'), findsOneWidget);
     expect(find.byIcon(Icons.check_box_outlined), findsWidgets);
     expect(emittedSelection, isNull);
 
@@ -429,10 +429,7 @@ void main() {
         home: Scaffold(
           body: MediaAssetLibrary(
             config: const MediaAssetLibraryConfig(
-              layout: MediaAssetLayoutConfig(
-                showToolbar: false,
-                sortMode: MediaAssetSortMode.manual,
-              ),
+              layout: MediaAssetLayoutConfig(showToolbar: false),
               interaction: MediaAssetInteractionConfig(
                 enableAssetDragging: false,
               ),
@@ -517,12 +514,63 @@ void main() {
     expect(find.byIcon(Icons.add_photo_alternate_outlined), findsOneWidget);
   });
 
-  testWidgets('orders assets by created time descending by default', (
+  testWidgets('hides built-in import button when disabled', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MediaAssetLibrary(
+            assets: const [],
+            showImportButton: false,
+            config: const MediaAssetLibraryConfig(
+              layout: MediaAssetLayoutConfig(showToolbar: false),
+            ),
+            onImportFiles: (files) async {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('导入素材'), findsNothing);
+    expect(find.byIcon(Icons.add_photo_alternate_outlined), findsNothing);
+    expect(find.text('拖入图片或视频'), findsOneWidget);
+  });
+
+  testWidgets('supports simple height and internal header collapse', (
     tester,
   ) async {
-    final older = DateTime(2026, 1, 1);
-    final newer = DateTime(2026, 1, 2);
+    final asset = MediaAsset(
+      id: 'asset',
+      name: 'asset.png',
+      filePath: '/tmp/asset.png',
+      type: MediaAssetType.image,
+      fileSize: 0,
+      createdAt: DateTime(2026, 1, 1),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MediaAssetLibrary(
+            title: '三视图',
+            assets: [asset],
+            height: 180,
+            collapsible: true,
+          ),
+        ),
+      ),
+    );
 
+    expect(find.text('三视图'), findsOneWidget);
+    expect(findAssetDrag('asset'), findsOneWidget);
+    expect(find.byIcon(Icons.keyboard_arrow_up_rounded), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.keyboard_arrow_up_rounded));
+    await tester.pump();
+
+    expect(findAssetDrag('asset'), findsNothing);
+    expect(find.byIcon(Icons.keyboard_arrow_down_rounded), findsOneWidget);
+  });
+
+  testWidgets('keeps assets in caller-provided order', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -537,7 +585,7 @@ void main() {
                 filePath: '/tmp/older.png',
                 type: MediaAssetType.image,
                 fileSize: 0,
-                createdAt: older,
+                createdAt: DateTime(2026, 1, 1),
               ),
               MediaAsset(
                 id: 'newer',
@@ -545,7 +593,7 @@ void main() {
                 filePath: '/tmp/newer.png',
                 type: MediaAssetType.image,
                 fileSize: 0,
-                createdAt: newer,
+                createdAt: DateTime(2026, 1, 2),
               ),
             ],
           ),
@@ -553,92 +601,10 @@ void main() {
       ),
     );
 
-    final newerPosition = tester.getTopLeft(findAssetDrag('newer'));
     final olderPosition = tester.getTopLeft(findAssetDrag('older'));
+    final newerPosition = tester.getTopLeft(findAssetDrag('newer'));
 
-    expect(newerPosition.dx, lessThan(olderPosition.dx));
-  });
-
-  testWidgets('orders assets by configured sort mode', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: MediaAssetLibrary(
-            config: const MediaAssetLibraryConfig(
-              layout: MediaAssetLayoutConfig(
-                showToolbar: false,
-                sortMode: MediaAssetSortMode.nameAsc,
-              ),
-            ),
-            assets: [
-              MediaAsset(
-                id: 'z',
-                name: 'z.png',
-                filePath: '/tmp/z.png',
-                type: MediaAssetType.image,
-                fileSize: 0,
-                createdAt: DateTime(2026, 1, 1),
-              ),
-              MediaAsset(
-                id: 'a',
-                name: 'a.png',
-                filePath: '/tmp/a.png',
-                type: MediaAssetType.image,
-                fileSize: 0,
-                createdAt: DateTime(2026, 1, 2),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    final aPosition = tester.getTopLeft(findAssetDrag('a'));
-    final zPosition = tester.getTopLeft(findAssetDrag('z'));
-
-    expect(aPosition.dx, lessThan(zPosition.dx));
-  });
-
-  testWidgets('orders assets by custom comparator when provided', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: MediaAssetLibrary(
-            config: MediaAssetLibraryConfig(
-              layout: MediaAssetLayoutConfig(
-                showToolbar: false,
-                sortComparator: (a, b) => a.fileSize.compareTo(b.fileSize),
-              ),
-            ),
-            assets: [
-              MediaAsset(
-                id: 'large',
-                name: 'large.png',
-                filePath: '/tmp/large.png',
-                type: MediaAssetType.image,
-                fileSize: 200,
-                createdAt: DateTime(2026, 1, 1),
-              ),
-              MediaAsset(
-                id: 'small',
-                name: 'small.png',
-                filePath: '/tmp/small.png',
-                type: MediaAssetType.image,
-                fileSize: 100,
-                createdAt: DateTime(2026, 1, 2),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    final smallPosition = tester.getTopLeft(findAssetDrag('small'));
-    final largePosition = tester.getTopLeft(findAssetDrag('large'));
-
-    expect(smallPosition.dx, lessThan(largePosition.dx));
+    expect(olderPosition.dx, lessThan(newerPosition.dx));
   });
 
   testWidgets('shows default context menu without a builder', (tester) async {
