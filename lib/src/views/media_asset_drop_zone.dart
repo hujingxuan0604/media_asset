@@ -80,8 +80,8 @@ class MediaAssetEmptyDropZone extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 160),
       width: double.infinity,
-      constraints: const BoxConstraints(minHeight: 300),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 34),
+      constraints: const BoxConstraints(minHeight: 190),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
       decoration: BoxDecoration(
         color: isActive
             ? theme.primary(context).withValues(alpha: 0.08)
@@ -108,7 +108,7 @@ class MediaAssetEmptyDropZone extends StatelessWidget {
               color: theme.primary(context),
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           Text(
             isActive ? config.text.dropActiveTitle : config.text.emptyTitle,
             textAlign: TextAlign.center,
@@ -118,7 +118,7 @@ class MediaAssetEmptyDropZone extends StatelessWidget {
               color: theme.text(context),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             config.text.emptyDescription,
             textAlign: TextAlign.center,
@@ -129,7 +129,7 @@ class MediaAssetEmptyDropZone extends StatelessWidget {
             ),
           ),
           if (onAddPressed != null) ...[
-            const SizedBox(height: 18),
+            const SizedBox(height: 14),
             FilledButton.icon(
               onPressed: onAddPressed,
               icon: const Icon(Icons.add_photo_alternate_outlined, size: 16),

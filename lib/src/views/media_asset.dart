@@ -212,6 +212,7 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
               );
 
               return Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (scopedConfig.layout.showToolbar) ...[
@@ -261,17 +262,18 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
       return SizedBox(height: height, child: child);
     }
 
-    if (config.layout.shrinkWrap) {
-      return child;
-    }
-
-    return Expanded(child: child);
+    return child;
   }
 
   MediaAssetLibraryConfig _resolveConfig(MediaAssetLibraryConfig config) {
+    final height = widget.height ?? config.layout.height;
+    final shrinkWrap =
+        widget.shrinkWrap ?? (height == null ? true : config.layout.shrinkWrap);
+
     if (widget.height == null &&
         widget.shrinkWrap == null &&
-        widget.showToolbar == null) {
+        widget.showToolbar == null &&
+        shrinkWrap == config.layout.shrinkWrap) {
       return config;
     }
 
@@ -280,8 +282,8 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
       interaction: config.interaction,
       layout: MediaAssetLayoutConfig(
         showToolbar: widget.showToolbar ?? config.layout.showToolbar,
-        height: widget.height ?? config.layout.height,
-        shrinkWrap: widget.shrinkWrap ?? config.layout.shrinkWrap,
+        height: height,
+        shrinkWrap: shrinkWrap,
         thumbnailSize: config.layout.thumbnailSize,
       ),
       preview: config.preview,

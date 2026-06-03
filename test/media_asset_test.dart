@@ -262,6 +262,7 @@ void main() {
 
     expect(find.text('拖入图片或视频'), findsOneWidget);
     expect(find.byIcon(Icons.perm_media_outlined), findsOneWidget);
+    expect(tester.getSize(find.byType(AnimatedContainer)).height, 190);
   });
 
   testWidgets('removes selected ids that no longer exist in assets', (
@@ -349,6 +350,7 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: MediaAssetLibrary(
+            height: 360,
             config: const MediaAssetLibraryConfig(
               layout: MediaAssetLayoutConfig(showToolbar: false),
             ),

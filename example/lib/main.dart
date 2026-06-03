@@ -44,7 +44,6 @@ class _MediaAssetExamplePageState extends State<MediaAssetExamplePage> {
   final Set<String> _selectedAssetIds = {};
   final Set<String> _customSelectedAssetIds = {};
   double _moduleHeight = 280;
-  bool _moduleCollapsed = false;
 
   static const _config = MediaAssetLibraryConfig(
     importConfig: MediaAssetImportConfig(
@@ -135,10 +134,9 @@ class _MediaAssetExamplePageState extends State<MediaAssetExamplePage> {
         final target = _ModuleDropTarget(
           assets: _moduleAssets,
           height: _moduleHeight,
-          isCollapsed: _moduleCollapsed,
           onHeightChanged: _changeModuleHeight,
-          onToggleCollapsed: _toggleModuleCollapsed,
           onAcceptAsset: _addToModule,
+          onRemoveAsset: _removeFromModule,
         );
 
         if (constraints.maxWidth < 820) {
@@ -539,6 +537,11 @@ class _MediaAssetExamplePageState extends State<MediaAssetExamplePage> {
   }
 
   void _addToModule(MediaAsset asset) {
+    if (asset.type != MediaAssetType.image) {
+      _showMessage('三视图仅支持图片素材：${asset.name}');
+      return;
+    }
+
     if (_moduleAssets.any((item) => item.id == asset.id)) {
       _showMessage('${asset.name} 已在其他模块中');
       return;
@@ -550,15 +553,16 @@ class _MediaAssetExamplePageState extends State<MediaAssetExamplePage> {
     _showMessage('已添加到其他模块：${asset.name}');
   }
 
+  void _removeFromModule(MediaAsset asset) {
+    setState(() {
+      _moduleAssets.removeWhere((item) => item.id == asset.id);
+    });
+    _showMessage('已从三视图移除：${asset.name}');
+  }
+
   void _changeModuleHeight(double delta) {
     setState(() {
       _moduleHeight = (_moduleHeight + delta).clamp(180, 520);
-    });
-  }
-
-  void _toggleModuleCollapsed() {
-    setState(() {
-      _moduleCollapsed = !_moduleCollapsed;
     });
   }
 
@@ -939,183 +943,80 @@ String _formatBytes(int bytes) {
 class _ModuleDropTarget extends StatelessWidget {
   final List<MediaAsset> assets;
   final double height;
-  final bool isCollapsed;
   final ValueChanged<MediaAsset> onAcceptAsset;
+  final ValueChanged<MediaAsset> onRemoveAsset;
   final ValueChanged<double> onHeightChanged;
-  final VoidCallback onToggleCollapsed;
 
   const _ModuleDropTarget({
     required this.assets,
     required this.height,
-    required this.isCollapsed,
     required this.onAcceptAsset,
+    required this.onRemoveAsset,
     required this.onHeightChanged,
-    required this.onToggleCollapsed,
   });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return SizedBox(
-      height: isCollapsed ? 32 : height,
-      child: DragTarget<MediaAsset>(
-        onAcceptWithDetails: (details) => onAcceptAsset(details.data),
-        builder: (context, candidateData, rejectedData) {
-          final isActive = candidateData.isNotEmpty;
+    return DragTarget<MediaAsset>(
+      onWillAcceptWithDetails: (details) {
+        return details.data.type == MediaAssetType.image;
+      },
+      onAcceptWithDetails: (details) => onAcceptAsset(details.data),
+      builder: (context, candidateData, rejectedData) {
+        final isActive = candidateData.isNotEmpty;
 
-          return AnimatedContainer(
-            duration: const Duration(milliseconds: 140),
-            padding: const EdgeInsets.all(0),
-            decoration: BoxDecoration(
-              color: isActive
-                  ? colorScheme.primaryContainer.withValues(alpha: 0.42)
-                  : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: isActive
-                    ? colorScheme.primary
-                    : colorScheme.outlineVariant,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
               children: [
-                Padding(
-                  padding: const EdgeInsets.only(left: 14, right: 6),
-                  child: SizedBox(
-                    height: 32,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: onToggleCollapsed,
-                              borderRadius: BorderRadius.circular(8),
-                              hoverColor: Colors.transparent,
-                              highlightColor: Colors.transparent,
-                              splashColor: Colors.transparent,
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  '三视图',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.titleSmall
-                                      ?.copyWith(fontWeight: FontWeight.w700),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        _ModuleHeaderButton(
-                          icon: Icons.add_rounded,
-                          tooltip: '导入素材',
-                          onTap: null,
-                        ),
-                        const SizedBox(width: 6),
-                        _ModuleHeaderButton(
-                          icon: isCollapsed
-                              ? Icons.keyboard_arrow_down_rounded
-                              : Icons.keyboard_arrow_up_rounded,
-                          tooltip: isCollapsed ? '展开模块' : '折叠模块',
-                          onTap: onToggleCollapsed,
-                        ),
-                      ],
+                MediaAssetLibrary(
+                  title: '三视图',
+                  assets: assets,
+                  height: height,
+                  collapsible: true,
+                  showEmptyImportButton: false,
+                  onDeleteAsset: onRemoveAsset,
+                  config: const MediaAssetLibraryConfig(
+                    interaction: MediaAssetInteractionConfig(
+                      enableDragDrop: false,
+                      enableMultiSelection: false,
+                      enableAssetDragging: false,
+                      enabledActions: {
+                        MediaAssetAction.preview,
+                        MediaAssetAction.delete,
+                      },
+                    ),
+                    layout: MediaAssetLayoutConfig(thumbnailSize: Size(82, 62)),
+                    text: MediaAssetTextConfig(
+                      emptyTitle: '拖拽三视图图片到这里',
+                      emptyDescription: '仅支持图片素材。从项目素材库拖入后会关联到当前模块。',
                     ),
                   ),
                 ),
-                if (!isCollapsed) ...[
-                  const SizedBox(height: 12),
-                  if (assets.isEmpty)
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '拖入素材',
-                          style: TextStyle(color: colorScheme.onSurfaceVariant),
+                if (isActive)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 140),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primaryContainer.withValues(
+                            alpha: 0.18,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: colorScheme.primary),
                         ),
                       ),
-                    )
-                  else
-                    Expanded(
-                      child: ListView.separated(
-                        itemCount: assets.length,
-                        separatorBuilder: (context, index) =>
-                            const SizedBox(height: 8),
-                        itemBuilder: (context, index) {
-                          final asset = assets[index];
-                          return Row(
-                            children: [
-                              Icon(
-                                asset.type == MediaAssetType.video
-                                    ? Icons.videocam_outlined
-                                    : Icons.image_outlined,
-                                size: 17,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  asset.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
                     ),
-                  _ResizeHandle(onDragDelta: onHeightChanged),
-                ],
+                  ),
               ],
             ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _ModuleHeaderButton extends StatelessWidget {
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback? onTap;
-
-  const _ModuleHeaderButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              icon,
-              size: 18,
-              color: onTap == null
-                  ? colorScheme.onSurfaceVariant.withValues(alpha: 0.38)
-                  : colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ),
-      ),
+            _ResizeHandle(onDragDelta: onHeightChanged),
+          ],
+        );
+      },
     );
   }
 }

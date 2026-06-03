@@ -69,6 +69,10 @@ leaving the toolbar import button and drag-and-drop import available. Use
 `MediaAssetLibraryConfig` when you need deeper behavior such as file type rules,
 preview shortcuts, or custom text.
 
+When `height` is omitted, the library sizes itself to its content. Pass `height`
+when the host layout should constrain the asset grid and let it scroll inside
+that fixed space.
+
 Receive an imported asset elsewhere in your app:
 
 ```dart
