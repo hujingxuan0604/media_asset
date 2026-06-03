@@ -988,12 +988,25 @@ class _ModuleDropTarget extends StatelessWidget {
                     child: Row(
                       children: [
                         Expanded(
-                          child: Text(
-                            '三视图',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleSmall
-                                ?.copyWith(fontWeight: FontWeight.w700),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: onToggleCollapsed,
+                              borderRadius: BorderRadius.circular(8),
+                              hoverColor: Colors.transparent,
+                              highlightColor: Colors.transparent,
+                              splashColor: Colors.transparent,
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  '三视图',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.titleSmall
+                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                         _ModuleHeaderButton(

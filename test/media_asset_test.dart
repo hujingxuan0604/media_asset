@@ -514,16 +514,15 @@ void main() {
     expect(find.byIcon(Icons.add_photo_alternate_outlined), findsOneWidget);
   });
 
-  testWidgets('hides built-in import button when disabled', (tester) async {
+  testWidgets('hides empty import button without affecting toolbar import', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: MediaAssetLibrary(
             assets: const [],
-            showImportButton: false,
-            config: const MediaAssetLibraryConfig(
-              layout: MediaAssetLayoutConfig(showToolbar: false),
-            ),
+            showEmptyImportButton: false,
             onImportFiles: (files) async {},
           ),
         ),
@@ -532,6 +531,7 @@ void main() {
 
     expect(find.text('导入素材'), findsNothing);
     expect(find.byIcon(Icons.add_photo_alternate_outlined), findsNothing);
+    expect(find.byIcon(Icons.add_rounded), findsOneWidget);
     expect(find.text('拖入图片或视频'), findsOneWidget);
   });
 
@@ -563,7 +563,7 @@ void main() {
     expect(findAssetDrag('asset'), findsOneWidget);
     expect(find.byIcon(Icons.keyboard_arrow_up_rounded), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.keyboard_arrow_up_rounded));
+    await tester.tap(find.text('三视图'));
     await tester.pump();
 
     expect(findAssetDrag('asset'), findsNothing);

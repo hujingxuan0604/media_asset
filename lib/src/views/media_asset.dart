@@ -35,7 +35,7 @@ class MediaAssetLibrary extends StatefulWidget {
   final double? height;
   final bool? shrinkWrap;
   final bool? showToolbar;
-  final bool showImportButton;
+  final bool showEmptyImportButton;
   final bool collapsible;
   final bool isLoading;
   final MediaAssetImportCallback? onImportFiles;
@@ -67,7 +67,7 @@ class MediaAssetLibrary extends StatefulWidget {
     this.height,
     this.shrinkWrap,
     this.showToolbar,
-    this.showImportButton = true,
+    this.showEmptyImportButton = true,
     this.collapsible = false,
     this.isLoading = false,
     this.onImportFiles,
@@ -177,10 +177,6 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
                   : () => unawaited(
                       _handleAddPressed(context, scopedConfig, controller),
                     ));
-          final visibleOnAddPressed = widget.showImportButton
-              ? onAddPressed
-              : null;
-
           return AnimatedBuilder(
             animation: _selectionController,
             builder: (context, child) {
@@ -197,7 +193,7 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
                 config: scopedConfig,
                 isCollapsed: _isCollapsed,
                 isCollapsible: widget.collapsible,
-                onAddPressed: visibleOnAddPressed,
+                onAddPressed: onAddPressed,
                 onToggleCollapsed: widget.collapsible ? _toggleCollapsed : null,
                 onSelectAll: () => _emitSelection(
                   _selectionController.selectAll(
@@ -232,7 +228,7 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
                             scopedConfig.interaction.enableDragDrop &&
                             widget.onImportFiles != null,
                         hasAssets: orderedAssets.isNotEmpty,
-                        onAddPressed: visibleOnAddPressed,
+                        onAddPressed: onAddPressed,
                         onFilesDropped: (files) => _handleDroppedFiles(
                           context,
                           scopedConfig,
@@ -324,7 +320,7 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
           MediaAssetEmptyDropZone(
             config: config,
             isActive: false,
-            onAddPressed: widget.showImportButton
+            onAddPressed: widget.showEmptyImportButton
                 ? widget.onAddPressed ??
                       (widget.onImportFiles == null
                           ? null

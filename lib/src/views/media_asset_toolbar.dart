@@ -62,20 +62,12 @@ class MediaAssetToolbar extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Tooltip(
-              message: selectedCount > 0
+            child: _ToolbarTitleArea(
+              title: state.title,
+              tooltip: selectedCount > 0
                   ? '已选择 $selectedCount / $assetCount'
                   : '共 $assetCount 个素材',
-              child: Text(
-                state.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: theme.text(context),
-                ),
-              ),
+              onTap: state.isCollapsible ? state.onToggleCollapsed : null,
             ),
           ),
           if (selectedCount > 0) ...[
@@ -119,6 +111,50 @@ class MediaAssetToolbar extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _ToolbarTitleArea extends StatelessWidget {
+  final String title;
+  final String tooltip;
+  final VoidCallback? onTap;
+
+  const _ToolbarTitleArea({
+    required this.title,
+    required this.tooltip,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = MediaAssetTheme.of(context);
+
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          hoverColor: Colors.transparent,
+          highlightColor: Colors.transparent,
+          splashColor: Colors.transparent,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: theme.text(context),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

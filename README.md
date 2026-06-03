@@ -32,7 +32,7 @@ MediaAssetLibrary(
   assets: assets,
   height: 320,
   collapsible: true,
-  showImportButton: false,
+  showEmptyImportButton: false,
   selectedAssetIds: selectedAssetIds,
   onSelectionChanged: (ids) {
     setState(() => selectedAssetIds = ids);
@@ -64,8 +64,8 @@ MediaAssetLibrary(
 
 Common layout options such as `height`, `shrinkWrap`, `showToolbar`, and
 `collapsible` can be passed directly to `MediaAssetLibrary`. Set
-`showImportButton` to `false` to keep drag-and-drop import while hiding the
-built-in import button. Use
+`showEmptyImportButton` to `false` to hide the empty-state import button while
+leaving the toolbar import button and drag-and-drop import available. Use
 `MediaAssetLibraryConfig` when you need deeper behavior such as file type rules,
 preview shortcuts, or custom text.
 
