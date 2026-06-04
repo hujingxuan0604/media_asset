@@ -15,6 +15,7 @@ class MediaAssetGrid extends StatelessWidget {
   final ValueChanged<MediaAsset> onPreviewAsset;
   final ValueChanged<MediaAsset>? onToggleSelection;
   final ValueChanged<MediaAsset>? onDeleteAsset;
+  final bool Function(MediaAsset asset)? canDeleteAsset;
   final ValueChanged<MediaAsset>? onRevealAssetInFolder;
   final MediaAssetTileBuilder? tileBuilder;
   final MediaAssetMenuBuilder? menuBuilder;
@@ -31,6 +32,7 @@ class MediaAssetGrid extends StatelessWidget {
     this.duplicateHighlightTokens = const {},
     this.onToggleSelection,
     this.onDeleteAsset,
+    this.canDeleteAsset,
     this.onRevealAssetInFolder,
     this.tileBuilder,
     this.menuBuilder,
@@ -90,6 +92,8 @@ class MediaAssetGrid extends StatelessWidget {
   ) {
     final tileKey = ValueKey<String>(asset.id);
     final interaction = config.interaction;
+    final canDelete =
+        onDeleteAsset != null && (canDeleteAsset?.call(asset) ?? true);
     final state = MediaAssetTileState(
       isBatchSelected: selectedAssetIds.contains(asset.id),
       duplicateHighlightToken: duplicateHighlightTokens[asset.id] ?? 0,
@@ -126,8 +130,7 @@ class MediaAssetGrid extends StatelessWidget {
           ? null
           : () => onToggleSelection!(asset),
       onDelete:
-          onDeleteAsset == null ||
-              !interaction.isActionEnabled(MediaAssetAction.delete)
+          !canDelete || !interaction.isActionEnabled(MediaAssetAction.delete)
           ? null
           : () => onDeleteAsset!(asset),
       onRevealInFolder:

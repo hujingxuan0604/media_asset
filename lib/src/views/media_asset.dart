@@ -96,7 +96,9 @@ class MediaAssetLibrary extends StatefulWidget {
 
 class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
   late final MediaAssetSelectionController _selectionController;
+  final List<MediaAsset> _localAssets = [];
   final Map<String, int> _duplicateHighlightTokens = {};
+  int _localImportSequence = 0;
   late bool _isCollapsed;
 
   @override
@@ -131,7 +133,7 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
         : _selectionController.selectedAssetIds;
     final nextSelection = _validSelectedAssetIds(
       incomingSelection,
-      widget.assets,
+      _orderedAssets,
     );
 
     if (!_hasSameIds(_selectionController.selectedAssetIds, nextSelection)) {
@@ -172,7 +174,7 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
 
           final onAddPressed =
               widget.onAddPressed ??
-              (widget.onImportFiles == null
+              (!_canUseBuiltInImport(scopedConfig)
                   ? null
                   : () => unawaited(
                       _handleAddPressed(context, scopedConfig, controller),
@@ -203,12 +205,12 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
                 onClearSelection: () =>
                     _emitSelection(_selectionController.clear()),
                 onDeleteSelected:
-                    widget.onDeleteSelectedAssets == null ||
+                    !_canDeleteAssets(selectedAssets) ||
                         !scopedConfig.interaction.isActionEnabled(
                           MediaAssetAction.delete,
                         )
                     ? null
-                    : () => widget.onDeleteSelectedAssets!(selectedAssets),
+                    : () => _handleDeleteSelectedAssets(selectedAssets),
               );
 
               return Column(
@@ -225,9 +227,7 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
                       scopedConfig,
                       MediaAssetDropZone(
                         config: scopedConfig,
-                        enabled:
-                            scopedConfig.interaction.enableDragDrop &&
-                            widget.onImportFiles != null,
+                        enabled: scopedConfig.interaction.enableDragDrop,
                         hasAssets: orderedAssets.isNotEmpty,
                         onAddPressed: onAddPressed,
                         onFilesDropped: (files) => _handleDroppedFiles(
@@ -298,7 +298,7 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
   }
 
   List<MediaAsset> get _orderedAssets =>
-      List<MediaAsset>.of(widget.assets, growable: false);
+      List<MediaAsset>.of([...widget.assets, ..._localAssets], growable: false);
 
   List<MediaAsset> _selectedAssetsFrom(List<MediaAsset> assets) {
     final selectedIds = _selectionController.selectedAssetIds;
@@ -324,7 +324,7 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
             isActive: false,
             onAddPressed: widget.showEmptyImportButton
                 ? widget.onAddPressed ??
-                      (widget.onImportFiles == null
+                      (!_canUseBuiltInImport(config)
                           ? null
                           : () => unawaited(
                               _handleAddPressed(context, config, controller),
@@ -345,6 +345,7 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
           menuBuilder: widget.menuBuilder,
           selectionBadgeBuilder: widget.selectionBadgeBuilder,
           dragFeedbackBuilder: widget.dragFeedbackBuilder,
+          canDeleteAsset: widget.onDeleteAsset == null ? _isLocalAsset : null,
           onTapAsset: (_) {},
           onPreviewAsset: (asset) {
             controller.handleAction(MediaAssetAction.preview, asset);
@@ -356,9 +357,16 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
               ? (asset) => _emitSelection(_selectionController.toggle(asset.id))
               : null,
           onDeleteAsset: widget.onDeleteAsset == null
-              ? null
+              ? (asset) {
+                  controller.handleAction(MediaAssetAction.delete, asset);
+                  _handleDeleteLocalAsset(asset);
+                }
               : (asset) {
                   controller.handleAction(MediaAssetAction.delete, asset);
+                  if (_isLocalAsset(asset)) {
+                    _handleDeleteLocalAsset(asset);
+                    return;
+                  }
                   widget.onDeleteAsset!(asset);
                 },
           onRevealAssetInFolder: widget.onRevealAssetInFolder == null
@@ -425,7 +433,17 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
   ) async {
     final messenger = ScaffoldMessenger.maybeOf(context);
     final result = await controller.handleDroppedFiles(files);
-    if (!mounted || !result.hasDuplicateFiles) {
+    if (!mounted) {
+      return;
+    }
+
+    if (widget.onImportFiles == null && result.hasAcceptedFiles) {
+      setState(() {
+        _localAssets.addAll(_localAssetsFrom(result.acceptedFiles));
+      });
+    }
+
+    if (!result.hasDuplicateFiles) {
       return;
     }
 
@@ -476,6 +494,79 @@ class _MediaAssetLibraryState extends State<MediaAssetLibrary> {
       return;
     }
     await _handleDroppedFiles(context, config, controller, files);
+  }
+
+  bool _canUseBuiltInImport(MediaAssetLibraryConfig config) {
+    return widget.onImportFiles != null || config.interaction.enableDragDrop;
+  }
+
+  List<MediaAsset> _localAssetsFrom(List<ValidatedMediaAssetImport> files) {
+    final importedAt = DateTime.now();
+    return files
+        .map((file) {
+          final sequence = _localImportSequence++;
+          return MediaAsset(
+            id: 'local-${importedAt.microsecondsSinceEpoch}-$sequence-${file.path}',
+            name: file.name,
+            filePath: file.path,
+            type: file.type,
+            fileSize: file.fileSize,
+            contentHash: file.contentHash,
+            createdAt: importedAt,
+          );
+        })
+        .toList(growable: false);
+  }
+
+  bool _isLocalAsset(MediaAsset asset) {
+    return _localAssets.any((item) => item.id == asset.id);
+  }
+
+  bool _canDeleteAssets(List<MediaAsset> assets) {
+    if (assets.isEmpty) {
+      return false;
+    }
+    final hasExternalAssets = assets.any((asset) => !_isLocalAsset(asset));
+    return !hasExternalAssets || widget.onDeleteSelectedAssets != null;
+  }
+
+  void _handleDeleteSelectedAssets(List<MediaAsset> assets) {
+    final localAssets = assets.where(_isLocalAsset).toList(growable: false);
+    final externalAssets = assets
+        .where((asset) => !_isLocalAsset(asset))
+        .toList(growable: false);
+
+    if (externalAssets.isNotEmpty) {
+      widget.onDeleteSelectedAssets?.call(externalAssets);
+    }
+    if (localAssets.isNotEmpty) {
+      _deleteLocalAssets(localAssets);
+    }
+  }
+
+  void _handleDeleteLocalAsset(MediaAsset asset) {
+    if (!_isLocalAsset(asset)) {
+      return;
+    }
+    _deleteLocalAssets([asset]);
+  }
+
+  void _deleteLocalAssets(List<MediaAsset> assets) {
+    final deletedIds = assets.map((asset) => asset.id).toSet();
+    setState(() {
+      _localAssets.removeWhere((asset) => deletedIds.contains(asset.id));
+    });
+
+    final selectedIds = _selectionController.selectedAssetIds;
+    if (!selectedIds.any(deletedIds.contains)) {
+      return;
+    }
+
+    final nextSelection = selectedIds
+        .where((assetId) => !deletedIds.contains(assetId))
+        .toSet();
+    _selectionController.replace(nextSelection);
+    widget.onSelectionChanged?.call(nextSelection);
   }
 
   Future<void> _showPreview(

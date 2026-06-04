@@ -30,6 +30,21 @@ Render the library:
 MediaAssetLibrary(
   title: '项目素材库',
   assets: assets,
+)
+```
+
+By default, desktop drag-and-drop and the built-in import button are ready to
+use. Dropped or picked files are validated with `MediaAssetImportConfig` and are
+shown as local in-memory `MediaAsset` values, so a simple desktop tool can start
+with only the widget above.
+
+Use callbacks when the host app needs to copy files, persist metadata, or sync
+asset state:
+
+```dart
+MediaAssetLibrary(
+  title: '项目素材库',
+  assets: assets,
   height: 320,
   collapsible: true,
   showEmptyImportButton: false,
@@ -67,7 +82,16 @@ Common layout options such as `height`, `shrinkWrap`, `showToolbar`, and
 `showEmptyImportButton` to `false` to hide the empty-state import button while
 leaving the toolbar import button and drag-and-drop import available. Use
 `MediaAssetLibraryConfig` when you need deeper behavior such as file type rules,
-preview shortcuts, or custom text.
+preview shortcuts, custom text, or disabling import for a read-only surface:
+
+```dart
+MediaAssetLibrary(
+  assets: assets,
+  config: const MediaAssetLibraryConfig(
+    interaction: MediaAssetInteractionConfig(enableDragDrop: false),
+  ),
+)
+```
 
 When `height` is omitted, the library sizes itself to its content. Pass `height`
 when the host layout should constrain the asset grid and let it scroll inside
@@ -90,10 +114,12 @@ DragTarget<MediaAsset>(
 Set global defaults with `MediaAssetLibraryScope`, or pass a component-level
 `MediaAssetLibraryConfig` directly to `MediaAssetLibrary`.
 
-When `onImportFiles` is provided, the built-in import button opens the desktop
-file picker and then uses the same validation, duplicate, and callback pipeline
-as drag-and-drop. Pass `onAddPressed` only when the host app needs to replace
-that default behavior.
+The built-in import button opens the desktop file picker and then uses the same
+validation and duplicate-checking pipeline as drag-and-drop. When
+`onImportFiles` is omitted, accepted files are added to the widget's in-memory
+asset list. When `onImportFiles` is provided, the host app owns the import and
+should rebuild with new `MediaAsset` values. Pass `onAddPressed` only when the
+host app needs to replace the default picker behavior.
 
 Context-menu behavior lives under `MediaAssetInteractionConfig`. Its
 `enableContextMenu` option controls the built-in right-click menu. When

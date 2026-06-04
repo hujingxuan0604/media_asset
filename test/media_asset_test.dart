@@ -262,7 +262,7 @@ void main() {
 
     expect(find.text('拖入图片或视频'), findsOneWidget);
     expect(find.byIcon(Icons.perm_media_outlined), findsOneWidget);
-    expect(tester.getSize(find.byType(AnimatedContainer)).height, 190);
+    expect(tester.getSize(find.byType(AnimatedContainer)).height, 210);
   });
 
   testWidgets('removes selected ids that no longer exist in assets', (
@@ -495,25 +495,47 @@ void main() {
     expect(find.text('asset'), findsOneWidget);
   });
 
-  testWidgets('shows default local import button when import callback exists', (
+  testWidgets(
+    'shows default local import button with built-in import enabled',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: MediaAssetLibrary(
+              assets: const [],
+              config: const MediaAssetLibraryConfig(
+                layout: MediaAssetLayoutConfig(showToolbar: false),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('导入素材'), findsOneWidget);
+      expect(find.byIcon(Icons.add_photo_alternate_outlined), findsOneWidget);
+    },
+  );
+
+  testWidgets('hides built-in import entry points when drag-drop is disabled', (
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
+      const MaterialApp(
         home: Scaffold(
           body: MediaAssetLibrary(
-            assets: const [],
-            config: const MediaAssetLibraryConfig(
-              layout: MediaAssetLayoutConfig(showToolbar: false),
+            assets: [],
+            config: MediaAssetLibraryConfig(
+              interaction: MediaAssetInteractionConfig(enableDragDrop: false),
             ),
-            onImportFiles: (files) async {},
           ),
         ),
       ),
     );
 
-    expect(find.text('导入素材'), findsOneWidget);
-    expect(find.byIcon(Icons.add_photo_alternate_outlined), findsOneWidget);
+    expect(find.text('导入素材'), findsNothing);
+    expect(find.byIcon(Icons.add_photo_alternate_outlined), findsNothing);
+    expect(find.byIcon(Icons.add_rounded), findsNothing);
+    expect(find.text('拖入图片或视频'), findsOneWidget);
   });
 
   testWidgets('hides empty import button without affecting toolbar import', (
